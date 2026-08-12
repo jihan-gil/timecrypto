@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Time Currency</title>
+<style>
+  :root{
+    --bg:#0f1215; --panel:#171b1f; --line:#262b30;
+    --tc:#e9e2d0; --tc-dim:#8a8f95;
+    --earn:#5fbf8f; --spend:#d97757;
+    --text:#e6e6e6; --sub:#9aa0a6;
+    --mono: 'SF Mono', 'Consolas', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{width:600px; max-height:700px; height:auto;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  /* HEADER */
+  #header{
+    padding:12px 20px 8px; border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#181c20,#141719); flex:0 0 auto;
+  }
+  #tcBalance{
+    font-family:var(--mono); font-size:32px; font-weight:700; color:var(--tc);
+    letter-spacing:-0.5px; line-height:1;
+  }
+  #tcBalance.neg{color:var(--spend);}
+  #tcTime{ font-size:12px; color:var(--sub); margin-top:4px;}
+  #tcMeta{ display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--tc-dim); font-family:var(--mono);}
+  #tcMeta span b{color:var(--sub); font-weight:600;}
+
+  /* GRAPH */
+  #graphWrap{
+    flex:0 0 auto; padding:8px 20px; border-bottom:1px solid var(--line);
+    background:#121518;
+  }
+  #tcGraph{ width:100%; height:56px; display:block; }
+  #graphRangeSelector{ display:flex; gap:4px; margin-top:6px; }
+  .rangeBtn{
+    flex:1; background:#1c2025; border:1px solid var(--line); color:var(--sub);
+    font-size:10.5px; font-family:var(--mono); padding:3px 0; border-radius:5px;
+    cursor:pointer; text-align:center; transition:background .12s, color .12s;
+  }
+  .rangeBtn:hover{ background:#22262c; color:var(--text); }
+  .rangeBtn.active{ background:#20262b; border-color:var(--tc-dim); color:var(--text); font-weight:600; }
+
+  /* TIMERS ROW */
+  #timers{ display:flex; flex:0 0 auto; gap:1px; background:var(--line); border-bottom:1px solid var(--line);}
+  .panel{ flex:1; background:var(--panel); padding:8px 10px 10px; display:flex; flex-direction:column; gap:1px;}
+  .panelTitle{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px; color:var(--sub); margin-bottom:4px;}
+
+  .row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px; border-radius:6px; cursor:pointer;
+    background:#1c2025; border:1px solid transparent;
+    font-size:12.5px; transition:background .12s;
+  }
+  .row:hover{ background:#22262c; }
+  .row.active{
+    border-color:var(--earn); background:#16261e;
+  }
+  .row.active.spend-mode{ border-color:var(--spend); background:#2a1c16; }
+  .rowLeft{ display:flex; flex-direction:column; gap:1px; }
+  .rowName{ font-weight:600; }
+  .rowRate{ font-size:10px; color:var(--tc-dim); font-family:var(--mono);}
+  .rowValue{ font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--earn); min-width:54px; text-align:right;}
+  .spend-mode .rowValue{ color:var(--spend); }
+
+  /* CHECKLIST */
+  #checklist{ flex:1 1 auto; min-height:0; padding:10px 20px 12px; display:flex; flex-direction:column; gap:6px; overflow:hidden;}
+  #checklistHead{ display:flex; justify-content:space-between; align-items:center; flex:0 0 auto;}
+  #checklistHead h3{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--sub);}
+  #addTaskRow{ display:flex; gap:6px; flex:0 0 auto; }
+  #newTaskInput{
+    flex:1; background:#171b1f; border:1px solid var(--line); color:var(--text);
+    padding:7px 9px; border-radius:6px; font-size:12.5px; font-family:inherit;
+  }
+  #newTaskInput:focus{ outline:none; border-color:var(--earn); }
+  #addTaskBtn{
+    background:#1c2025; border:1px solid var(--line); color:var(--text);
+    font-size:12px; padding:6px 14px; border-radius:6px; cursor:pointer;
+  }
+  #addTaskBtn:hover{ background:#22262c; }
+  #taskList{ overflow-y:auto; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:6px; }
+  .taskRow{
+    display:flex; align-items:center; gap:10px; padding:7px 10px;
+    background:#171b1f; border:1px solid var(--line); border-radius:6px; font-size:12.5px; flex:0 0 auto;
+  }
+  .taskRow.done{ opacity:0.45; }
+  .taskRow.done .taskName{ text-decoration:line-through; }
+  .taskName{ flex:1; }
+  .taskReward{ font-family:var(--mono); font-size:11.5px; color:var(--earn); }
+  input[type=checkbox]{ width:15px; height:15px; accent-color:var(--earn); cursor:pointer; }
+  .taskDel{ color:var(--tc-dim); cursor:pointer; font-size:13px; padding:0 4px; }
+  .taskDel:hover{ color:var(--spend); }
+  #hiddenToggle{ font-size:10.5px; color:var(--sub); cursor:pointer; flex:0 0 auto; }
+
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="tcBalance">0 TC</div>
+  <div id="tcTime">= 0h 0m</div>
+  <div id="tcMeta">
+    <span>Today earned: <b id="dailyEarned">0</b>/180 TC</span>
+    <span>Efficiency: <b id="efficiency">100%</b></span>
+  </div>
+</div>
+
+<div id="graphWrap">
+  <svg id="tcGraph" viewBox="0 0 560 56" preserveAspectRatio="none"></svg>
+  <div id="graphRangeSelector">
+    <div class="rangeBtn" data-range="6H">6H</div>
+    <div class="rangeBtn" data-range="12H">12H</div>
+    <div class="rangeBtn" data-range="24H">24H</div>
+    <div class="rangeBtn" data-range="1W">1W</div>
+  </div>
+</div>
+
+<div id="timers">
+  <div class="panel" id="stopwatchPanel">
+    <div class="panelTitle">Stopwatch — Earn</div>
+  </div>
+  <div class="panel" id="countdownPanel">
+    <div class="panelTitle">Countdown — Spend</div>
+  </div>
+</div>
+
+<div id="checklist">
+  <div id="checklistHead">
+    <h3>Checklist</h3>
+    <div id="hiddenToggle"></div>
+  </div>
+  <div id="addTaskRow">
+    <input type="text" id="newTaskInput" placeholder="Enter task...">
+    <button id="addTaskBtn">Add</button>
+  </div>
+  <div id="taskList"></div>
+</div>
+
+
+<script>
+/* ============ CONSTANTS FROM rules.md ============ */
+const STOPWATCH = [
+  {key:'study',    name:'Study',          mult:1.25},
+  {key:'work',     name:'Work / Projects',mult:1.15},
+  {key:'exercise', name:'Exercise',       mult:1.10},
+  {key:'chores',   name:'Chores',         mult:1.00},
+  {key:'creative', name:'Creative',       mult:0.95},
+  {key:'reading',  name:'Reading',        mult:0.95},
+];
+const COUNTDOWN = [
+  {key:'break',    name:'Break',    mult:0.50, durationMin:15},
+  {key:'watching', name:'Watching', mult:0.90, durationMin:30},
+  {key:'gaming',   name:'Gaming',   mult:1.00, durationMin:30},
+  {key:'browsing', name:'Browsing', mult:1.15, durationMin:20},
+  {key:'outside',  name:'Outside',  mult:0.35, durationMin:45},
+];
+
+/* Fixed-point precision: all TC amounts stored internally as integer
+   "centi-TC" (hundredths of a TC) to avoid floating-point drift. */
+const CTC = 100; // 1 TC = 100 centi-TC
+function toCTC(tc){ return Math.round(tc * CTC); }
+function fromCTC(c){ return c / CTC; }
+
+const DAILY_CAP = toCTC(180);
+const WALLET_TIERS = [
+  {max:toCTC(240), eff:1.00},
+  {max:toCTC(480), eff:0.75},
+  {max:toCTC(720), eff:0.50},
+  {max:Infinity,   eff:0.00},
+];
+
+/* ============ INDEXEDDB LAYER ============ */
+const DB_NAME = 'time_currency_db';
+const DB_VERSION = 1;
+let db;
+
+function openDB(){
+  return new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e)=>{
+      const d = e.target.result;
+      if(!d.objectStoreNames.contains('state')) d.createObjectStore('state', {keyPath:'id'});
+      if(!d.objectStoreNames.contains('tasks')) d.createObjectStore('tasks', {keyPath:'id'});
+    };
+    req.onsuccess = (e)=>{ db = e.target.result; resolve(db); };
+    req.onerror = (e)=> reject(e);
+  });
+}
+function txStore(name, mode='readonly'){
+  return db.transaction(name, mode).objectStore(name);
+}
+function idbGet(store, key){
+  return new Promise((resolve,reject)=>{
+    const r = txStore(store).get(key);
+    r.onsuccess = ()=>resolve(r.result);
+    r.onerror = (e)=>reject(e);
+  });
+}
+function idbPut(store, value){
+  return new Promise((resolve,reject)=>{
+    const r = txStore(store,'readwrite').put(value);
+    r.onsuccess = ()=>resolve();
+    r.onerror = (e)=>reject(e);
+  });
+}
+function idbDelete(store, key){
+  return new Promise((resolve,reject)=>{
+    const r = txStore(store,'readwrite').delete(key);
+    r.onsuccess = ()=>resolve();
+    r.onerror = (e)=>reject(e);
+  });
+}
+function idbGetAll(store){
+  return new Promise((resolve,reject)=>{
+    const r = txStore(store).getAll();
+    r.onsuccess = ()=>resolve(r.result);
+    r.onerror = (e)=>reject(e);
+  });
+}
+
+/* ============ STATE ============ */
+let state = {
+  id:'main',
+  tc: 0,                 // BASE balance, integer centi-TC (hundredths). Persisted only on commit.
+  dailyEarned: 0,        // integer centi-TC
+  dailyDate: todayStr(),
+  activeTimer: null,     // {type:'stopwatch'|'countdown', category, started_at, duration?}
+  history: [],           // [{t: timestamp, tc: fractional TC}], recorded at meaningful events only
+};
+
+const HISTORY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // keep enough to cover the full 1-week range
+
+// Records a persistent history point at meaningful TC-changing events
+// (timer start/stop/expire, checklist toggle). Not called on every tick.
+// Prunes points older than 7 days rather than capping by count.
+function recordHistoryPoint(){
+  if(!Array.isArray(state.history)) state.history = [];
+  state.history.push({ t: Date.now(), tc: fromCTC(state.tc) });
+  const cutoff = Date.now() - HISTORY_MAX_AGE_MS;
+  state.history = state.history.filter(p => p.t >= cutoff);
+}
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+async function loadState(){
+  const s = await idbGet('state','main');
+  if(s) state = s;
+  else await idbPut('state', state);
+  if(!Array.isArray(state.history)) state.history = [];
+  rolloverDayIfNeeded();
+}
+async function saveState(){
+  await idbPut('state', {...state});
+}
+function rolloverDayIfNeeded(){
+  const t = todayStr();
+  if(state.dailyDate !== t){
+    state.dailyDate = t;
+    state.dailyEarned = 0;
+  }
+}
+
+/* ============ ECONOMY ============ */
+function walletEfficiency(balance){
+  const b = Math.max(0, balance); // negative wallet treated as 0 tier for efficiency purposes
+  for(const tier of WALLET_TIERS){
+    if(b <= tier.max) return tier.eff;
+  }
+  return 0;
+}
+
+// Apply wallet efficiency + daily cap to a raw earned amount (in TC, fractional),
+// using CURRENT persisted state. Commits the result to state.tc. Amounts are
+// converted to integer centi-TC before being added, so no float drift accumulates.
+// Returns the net TC (fractional) actually credited.
+function creditEarnedTC(rawTC){
+  rolloverDayIfNeeded();
+  const eff = walletEfficiency(state.tc);
+  let amountC = toCTC(rawTC * eff);
+  const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
+  amountC = Math.min(amountC, remainingDaily);
+  if(amountC > 0){
+    state.tc += amountC;
+    state.dailyEarned += amountC;
+  }
+  return fromCTC(amountC);
+}
+
+function debitSpentTC(rawTC){
+  const amountC = toCTC(rawTC);
+  state.tc -= amountC;
+  return fromCTC(amountC);
+}
+
+// Pure (non-mutating) calculation of what a raw earned amount WOULD net right now,
+// for live display purposes only. Mirrors creditEarnedTC's rules without committing.
+function previewEarnedTC(rawTC){
+  const eff = walletEfficiency(state.tc);
+  let amountC = toCTC(rawTC * eff);
+  const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
+  amountC = Math.min(amountC, remainingDaily);
+  return fromCTC(Math.max(0, amountC));
+}
+
+/* ============ TASKS ============ */
+let tasks = [];
+const CHECKLIST_REWARD = 3; // fixed +3 TC per task, per rules.md "Normal" tier simplified to a single flat reward
+
+async function loadTasks(){
+  tasks = await idbGetAll('tasks');
+}
+
+/* ============ TIMER TICK ============ */
+let tickHandle = null;
+
+function fmtElapsed(ms){
+  const s = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+             : `${m}:${String(sec).padStart(2,'0')}`;
+}
+
+// Formats "time until 0 TC" (or any countdown remaining-time display).
+// Takes total seconds. Above 99s: normal minutes/hours format. At 99s or
+// below: seconds-only, updating every second. Display formatting only —
+// does not affect any underlying timer/TC calculation.
+function fmtCountdownTime(totalSeconds){
+  const secs = Math.max(0, Math.floor(totalSeconds));
+  if(secs <= 99){
+    return `${secs}s`;
+  }
+  const totalMin = Math.floor(secs/60);
+  const h = Math.floor(totalMin/60), m = totalMin%60;
+  return h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
+}
+
+function startStopwatch(catKey){
+  if(state.activeTimer) stopActiveTimer(); // auto-stop current
+  state.activeTimer = {type:'stopwatch', category:catKey, started_at: Date.now()};
+  recordHistoryPoint();
+  saveState();
+  render();
+}
+
+function startCountdown(catKey){
+  if(state.activeTimer) stopActiveTimer();
+  const cat = COUNTDOWN.find(c=>c.key===catKey);
+  state.activeTimer = {type:'countdown', category:catKey, started_at: Date.now(), duration: cat.durationMin*60000};
+  recordHistoryPoint();
+  saveState();
+  render();
+}
+
+// Stops whatever is active, applying TC. If `expired` true, countdown reached 0 naturally.
+function stopActiveTimer(expired=false){
+  const t = state.activeTimer;
+  if(!t) return;
+  const now = Date.now();
+
+  if(t.type === 'stopwatch'){
+    const cat = STOPWATCH.find(c=>c.key===t.category);
+    const elapsedMin = (now - t.started_at)/60000;
+    const raw = elapsedMin * cat.mult;
+    creditEarnedTC(raw);
+  } else {
+    const cat = COUNTDOWN.find(c=>c.key===t.category);
+    let elapsedMs;
+    if(expired){
+      elapsedMs = t.duration; // full duration
+    } else {
+      elapsedMs = Math.min(now - t.started_at, t.duration);
+    }
+    const elapsedMin = elapsedMs/60000;
+    const raw = elapsedMin * cat.mult;
+    debitSpentTC(raw);
+  }
+  state.activeTimer = null;
+  recordHistoryPoint();
+  saveState();
+}
+
+function tick(){
+  if(!state.activeTimer){ render(); return; }
+  const t = state.activeTimer;
+  if(t.type === 'countdown'){
+    const remaining = t.duration - (Date.now() - t.started_at);
+    if(remaining <= 0){
+      stopActiveTimer(true);
+    }
+  }
+  render();
+}
+
+/* ============ UI BUILD ============ */
+const stopwatchPanel = document.getElementById('stopwatchPanel');
+const countdownPanel = document.getElementById('countdownPanel');
+const taskListEl = document.getElementById('taskList');
+const hiddenToggleEl = document.getElementById('hiddenToggle');
+
+let showCompleted = false;
+
+function buildStaticRows(){
+  STOPWATCH.forEach(cat=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.key = cat.key;
+    row.innerHTML = `
+      <div class="rowLeft">
+        <div class="rowName">${cat.name}</div>
+        <div class="rowRate">${cat.mult}× — +${Math.round(cat.mult*60)} TC/hr</div>
+      </div>
+      <div class="rowValue">—</div>
+    `;
+    row.addEventListener('click', ()=>{
+      if(state.activeTimer && state.activeTimer.type==='stopwatch' && state.activeTimer.category===cat.key){
+        stopActiveTimer();
+        render();
+      } else {
+        startStopwatch(cat.key);
+      }
+    });
+    stopwatchPanel.appendChild(row);
+  });
+
+  COUNTDOWN.forEach(cat=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.dataset.key = cat.key;
+    row.innerHTML = `
+      <div class="rowLeft">
+        <div class="rowName">${cat.name}</div>
+        <div class="rowRate">${cat.mult}× — −${Math.round(cat.mult*60)} TC/hr</div>
+      </div>
+      <div class="rowValue">—</div>
+    `;
+    row.addEventListener('click', ()=>{
+      if(state.activeTimer && state.activeTimer.type==='countdown' && state.activeTimer.category===cat.key){
+        stopActiveTimer();
+        render();
+      } else {
+        startCountdown(cat.key);
+      }
+    });
+    countdownPanel.appendChild(row);
+  });
+}
+
+// Computes the current LIVE balance (fractional TC) for display only.
+// Base persisted balance + whatever the active timer has accrued so far.
+// Never mutates state.tc.
+function liveBalanceTC(){
+  const baseTC = fromCTC(state.tc);
+  const t = state.activeTimer;
+  if(!t) return baseTC;
+
+  if(t.type === 'stopwatch'){
+    const cat = STOPWATCH.find(c=>c.key===t.category);
+    const elapsedMin = (Date.now() - t.started_at)/60000;
+    const raw = elapsedMin * cat.mult;
+    return baseTC + previewEarnedTC(raw);
+  } else {
+    const cat = COUNTDOWN.find(c=>c.key===t.category);
+    const elapsedMs = Math.min(Date.now() - t.started_at, t.duration);
+    const elapsedMin = elapsedMs/60000;
+    const raw = elapsedMin * cat.mult;
+    return baseTC - raw;
+  }
+}
+
+// Time-range selector for the graph. Selection lives in memory only
+// (resets to the 6H default on reload); underlying history is always persisted.
+const GRAPH_RANGES = {
+  '6H':  6  * 60 * 60 * 1000,
+  '12H': 12 * 60 * 60 * 1000,
+  '24H': 24 * 60 * 60 * 1000,
+  '1W':  7  * 24 * 60 * 60 * 1000,
+};
+let selectedGraphRange = '6H';
+
+document.querySelectorAll('.rangeBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedGraphRange = btn.dataset.range;
+    document.querySelectorAll('.rangeBtn').forEach(b=>b.classList.toggle('active', b===btn));
+    drawGraph();
+  });
+});
+document.querySelector(`.rangeBtn[data-range="${selectedGraphRange}"]`).classList.add('active');
+
+// Draws the compact TC history graph. Persistent points come from state.history
+// (recorded only at meaningful events); a transient live point is appended
+// for the current instant so an active timer's movement is visible without
+// writing to the database every frame. Only points within the selected time
+// range are shown; Y bounds are recalculated from the visible data each draw.
+function drawGraph(){
+  const svg = document.getElementById('tcGraph');
+  const hist = Array.isArray(state.history) ? state.history : [];
+  const now = Date.now();
+  const rangeMs = GRAPH_RANGES[selectedGraphRange] || GRAPH_RANGES['6H'];
+  const rangeStart = now - rangeMs;
+
+  let points = hist.filter(p => p.t >= rangeStart);
+  points.push({ t: now, tc: liveBalanceTC() }); // transient live endpoint, not persisted
+
+  if(points.length < 2){
+    svg.innerHTML = '';
+    return;
+  }
+
+  const w = 560, h = 56, pad = 4;
+  const minT = rangeStart, maxT = now;
+  const vals = points.map(p=>p.tc);
+  let minV = Math.min(...vals), maxV = Math.max(...vals);
+  const rawSpan = maxV - minV;
+  const yPad = Math.max(0.5, rawSpan * 0.1); // small padding so the line doesn't touch the edges
+  minV -= yPad; maxV += yPad;
+  const spanT = Math.max(1, maxT - minT);
+  const spanV = Math.max(0.01, maxV - minV);
+
+  const coords = points.map(p=>{
+    const x = pad + ((p.t - minT) / spanT) * (w - 2*pad);
+    const y = (h - pad) - ((p.tc - minV) / spanV) * (h - 2*pad);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+
+  const lastTC = points[points.length-1].tc;
+  let color;
+  if(lastTC < 0){
+    color = 'var(--spend)'; // negative balance: red/spend accent regardless of direction
+  } else {
+    const rising = lastTC >= points[0].tc;
+    color = rising ? 'var(--earn)' : 'var(--spend)';
+  }
+  svg.innerHTML = `<polyline points="${coords}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+function render(){
+  // Header
+  const balEl = document.getElementById('tcBalance');
+  const liveTC = liveBalanceTC();
+  balEl.textContent = `${liveTC.toFixed(2)} TC`;
+  balEl.classList.toggle('neg', liveTC < 0);
+  const totalMin = Math.abs(liveTC);
+  const h = Math.floor(totalMin/60), m = Math.floor(totalMin%60);
+  document.getElementById('tcTime').textContent = `= ${liveTC<0?'-':''}${h}h ${m}m`;
+  document.getElementById('dailyEarned').textContent = fromCTC(Math.min(state.dailyEarned, DAILY_CAP)).toFixed(2);
+  document.getElementById('efficiency').textContent = `${Math.round(walletEfficiency(state.tc)*100)}%`;
+
+  // Timer rows
+  document.querySelectorAll('#stopwatchPanel .row').forEach(row=>{
+    const key = row.dataset.key;
+    const active = state.activeTimer && state.activeTimer.type==='stopwatch' && state.activeTimer.category===key;
+    row.classList.toggle('active', !!active);
+    const valEl = row.querySelector('.rowValue');
+    if(active){
+      const cat = STOPWATCH.find(c=>c.key===key);
+      const elapsedMs = Date.now() - state.activeTimer.started_at;
+      const raw = (elapsedMs/60000) * cat.mult;
+      valEl.textContent = `${fmtElapsed(elapsedMs)}`;
+      valEl.title = `+${Math.round(raw)} TC so far`;
+    } else {
+      valEl.textContent = '—';
+    }
+  });
+
+  document.querySelectorAll('#countdownPanel .row').forEach(row=>{
+    const key = row.dataset.key;
+    const cat = COUNTDOWN.find(c=>c.key===key);
+    const active = state.activeTimer && state.activeTimer.type==='countdown' && state.activeTimer.category===key;
+    row.classList.toggle('active', !!active);
+    row.classList.toggle('spend-mode', !!active);
+    const valEl = row.querySelector('.rowValue');
+    // "Time until 0 TC" at this activity's spend rate, computed from the live
+    // balance (not the countdown's actual predefined duration/remaining time).
+    const secondsToZero = liveTC > 0 ? (liveTC / cat.mult) * 60 : 0;
+    valEl.textContent = fmtCountdownTime(secondsToZero);
+  });
+
+  renderTasks();
+  drawGraph();
+}
+
+function renderTasks(){
+  taskListEl.innerHTML = '';
+  const visible = tasks.filter(t=> showCompleted || !t.done);
+  visible.sort((a,b)=> (a.done - b.done) || (a.createdAt - b.createdAt));
+  visible.forEach(task=>{
+    const row = document.createElement('div');
+    row.className = 'taskRow' + (task.done ? ' done' : '');
+    row.innerHTML = `
+      <input type="checkbox" ${task.done?'checked':''}>
+      <div class="taskName">${escapeHTML(task.name)}</div>
+      <div class="taskReward">+${task.reward} TC</div>
+      <div class="taskDel">✕</div>
+    `;
+    row.querySelector('input').addEventListener('change', ()=>toggleTask(task.id));
+    row.querySelector('.taskDel').addEventListener('click', ()=>deleteTask(task.id));
+    taskListEl.appendChild(row);
+  });
+  const completedCount = tasks.filter(t=>t.done).length;
+  hiddenToggleEl.textContent = completedCount>0 ? (showCompleted ? 'Hide completed' : `Show completed (${completedCount})`) : '';
+}
+
+function escapeHTML(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+hiddenToggleEl.addEventListener('click', ()=>{ showCompleted = !showCompleted; renderTasks(); });
+
+/* ============ TASK ACTIONS ============ */
+async function toggleTask(id){
+  const task = tasks.find(t=>t.id===id);
+  if(!task) return;
+  task.done = !task.done;
+  if(task.done){
+    state.tc += toCTC(CHECKLIST_REWARD);
+  } else {
+    state.tc -= toCTC(CHECKLIST_REWARD);
+  }
+  recordHistoryPoint();
+  await idbPut('tasks', task);
+  await saveState();
+  render();
+}
+
+async function deleteTask(id){
+  const task = tasks.find(t=>t.id===id);
+  if(!task) return;
+  if(task.done){
+    state.tc -= toCTC(CHECKLIST_REWARD); // remove awarded TC if it was completed
+    recordHistoryPoint();
+    await saveState();
+  }
+  tasks = tasks.filter(t=>t.id!==id);
+  await idbDelete('tasks', id);
+  render();
+}
+
+const newTaskInput = document.getElementById('newTaskInput');
+async function addTaskFromInput(){
+  const name = newTaskInput.value.trim();
+  if(!name) return;
+  const task = { id: 'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), name, reward:CHECKLIST_REWARD, done:false, createdAt: Date.now() };
+  tasks.push(task);
+  await idbPut('tasks', task);
+  newTaskInput.value = '';
+  newTaskInput.focus();
+  render();
+}
+document.getElementById('addTaskBtn').addEventListener('click', addTaskFromInput);
+newTaskInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    addTaskFromInput();
+  }
+});
+
+/* ============ INIT ============ */
+async function init(){
+  await openDB();
+  await loadState();
+  await loadTasks();
+  buildStaticRows();
+  render();
+  tickHandle = setInterval(tick, 500); // display refresh only; TC math always derived from timestamps
+
+  // Persist on close as a safety net (state is already saved on every change,
+  // this just re-confirms the active timer timestamp is intact).
+  window.addEventListener('beforeunload', ()=>{ saveState(); });
+}
+init();
+</script>
+</body>
+</html>
