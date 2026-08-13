@@ -29,6 +29,12 @@
     letter-spacing:-0.5px; line-height:1;
   }
   #tcBalance.neg{color:var(--spend);}
+  .tcEditInput{
+    font-family:var(--mono); font-size:32px; font-weight:700; color:var(--tc);
+    letter-spacing:-0.5px; line-height:1; background:transparent; border:none;
+    border-bottom:1px dashed var(--tc-dim); outline:none; width:100%; padding:0;
+  }
+  .tcEditInput::placeholder{ color:var(--tc-dim); opacity:0.6; }
   #tcTime{ font-size:12px; color:var(--sub); margin-top:4px;}
   #tcMeta{ display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--tc-dim); font-family:var(--mono);}
   #tcMeta span b{color:var(--sub); font-weight:600;}
@@ -74,7 +80,11 @@
   #checklist{ flex:1 1 auto; min-height:0; padding:10px 20px 12px; display:flex; flex-direction:column; gap:6px; overflow:hidden;}
   #checklistHead{ display:flex; justify-content:space-between; align-items:center; flex:0 0 auto;}
   #checklistHead h3{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--sub);}
-  #addTaskRow{ display:flex; gap:6px; flex:0 0 auto; }
+  #addTaskRow{ display:flex; gap:6px; flex:0 0 auto; align-items:center; }
+  #starSelector{ display:flex; gap:1px; flex:0 0 auto; padding:0 2px; user-select:none; }
+  #starSelector .star{ font-size:15px; line-height:1; cursor:pointer; color:var(--tc-dim); transition:color .1s; }
+  #starSelector .star.filled{ color:var(--tc); }
+  #starSelector .star:hover{ color:var(--earn); }
   #newTaskInput{
     flex:1; background:#171b1f; border:1px solid var(--line); color:var(--text);
     padding:7px 9px; border-radius:6px; font-size:12.5px; font-family:inherit;
@@ -108,7 +118,6 @@
   <div id="tcTime">= 0h 0m</div>
   <div id="tcMeta">
     <span>Today earned: <b id="dailyEarned">0</b>/180 TC</span>
-    <span>Efficiency: <b id="efficiency">100%</b></span>
   </div>
 </div>
 
@@ -137,6 +146,13 @@
     <div id="hiddenToggle"></div>
   </div>
   <div id="addTaskRow">
+    <div id="starSelector" title="Reward">
+      <span class="star" data-n="1">★</span>
+      <span class="star" data-n="2">★</span>
+      <span class="star" data-n="3">★</span>
+      <span class="star" data-n="4">★</span>
+      <span class="star" data-n="5">★</span>
+    </div>
     <input type="text" id="newTaskInput" placeholder="Enter task...">
     <button id="addTaskBtn">Add</button>
   </div>
@@ -169,12 +185,75 @@ function toCTC(tc){ return Math.round(tc * CTC); }
 function fromCTC(c){ return c / CTC; }
 
 const DAILY_CAP = toCTC(180);
-const WALLET_TIERS = [
-  {max:toCTC(240), eff:1.00},
-  {max:toCTC(480), eff:0.75},
-  {max:toCTC(720), eff:0.50},
-  {max:Infinity,   eff:0.00},
+
+// Dynamic productive multiplier: piecewise-linear interpolation between
+// breakpoints, based on the CURRENT TC balance. Low balance = higher reward;
+// high balance = lower reward. Applies to all stopwatch (productive) activities.
+// effective_reward = base_reward × productiveMultiplierForBalance(balance)
+const PRODUCTIVE_MULT_BREAKPOINTS = [
+  {tc:0,   mult:1.25},
+  {tc:100, mult:1.20},
+  {tc:200, mult:1.00},
+  {tc:300, mult:0.80},
+  {tc:400, mult:0.60},
 ];
+
+function productiveMultiplierForBalance(balanceTC){
+  const b = Math.max(0, balanceTC);
+  if(b >= 400) return 0.60;
+  for(let i=0; i<PRODUCTIVE_MULT_BREAKPOINTS.length-1; i++){
+    const p0 = PRODUCTIVE_MULT_BREAKPOINTS[i], p1 = PRODUCTIVE_MULT_BREAKPOINTS[i+1];
+    if(b >= p0.tc && b <= p1.tc){
+      const t = (p1.tc === p0.tc) ? 0 : (b - p0.tc) / (p1.tc - p0.tc);
+      return p0.mult + t * (p1.mult - p0.mult);
+    }
+  }
+  return 0.60;
+}
+
+// Hard cap: TC may never exceed this, from any source.
+const TC_HARD_CAP = toCTC(400);
+
+// Dynamic countdown cost curves: piecewise-linear interpolation between
+// breakpoints, based on the CURRENT TC balance. Larger reserves cost more.
+// Break's curve values ARE its effective multiplier directly. All other
+// categories keep their static base cost (cat.mult) unchanged and apply
+// their own curve as a multiplier on top: effective = base_cost × curve(TC).
+// Tuned so a full 400 TC wallet funds roughly: Break 5.0h, Watching 4.4h,
+// Gaming 4.2h, Browsing 3.0h, Outside 8.0h.
+const COUNTDOWN_MULT_CURVES = {
+  break:    [{tc:0,mult:0.35},{tc:100,mult:0.50},{tc:200,mult:0.80},{tc:300,mult:1.50},{tc:400,mult:2.67}],
+  watching: [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.15},{tc:300,mult:1.30},{tc:350,mult:1.50},{tc:400,mult:1.68}],
+  gaming:   [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.12},{tc:300,mult:1.28},{tc:350,mult:1.45},{tc:400,mult:1.59}],
+  browsing: [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.20},{tc:300,mult:1.45},{tc:350,mult:1.70},{tc:400,mult:1.93}],
+  outside:  [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.30},{tc:300,mult:1.70},{tc:350,mult:2.05},{tc:400,mult:2.38}],
+};
+
+// Piecewise-linear interpolation across an arbitrary breakpoint curve.
+// Clamps to the first/last breakpoint's value outside its range.
+function interpolateCurve(curve, balanceTC){
+  const first = curve[0], last = curve[curve.length-1];
+  if(balanceTC <= first.tc) return first.mult;
+  if(balanceTC >= last.tc) return last.mult;
+  for(let i=0; i<curve.length-1; i++){
+    const p0 = curve[i], p1 = curve[i+1];
+    if(balanceTC >= p0.tc && balanceTC <= p1.tc){
+      const t = (p1.tc === p0.tc) ? 0 : (balanceTC - p0.tc) / (p1.tc - p0.tc);
+      return p0.mult + t * (p1.mult - p0.mult);
+    }
+  }
+  return last.mult;
+}
+
+// Unified effective multiplier for any countdown category at the current balance.
+// Break's curve is the full effective multiplier; other categories multiply
+// their unchanged base cost (cat.mult) by their own curve value.
+function effectiveCountdownMult(cat, balanceTC){
+  const curve = COUNTDOWN_MULT_CURVES[cat.key];
+  if(!curve) return cat.mult;
+  const curveVal = interpolateCurve(curve, balanceTC);
+  return (cat.key === 'break') ? curveVal : cat.mult * curveVal;
+}
 
 /* ============ INDEXEDDB LAYER ============ */
 const DB_NAME = 'time_currency_db';
@@ -271,28 +350,25 @@ function rolloverDayIfNeeded(){
 }
 
 /* ============ ECONOMY ============ */
-function walletEfficiency(balance){
-  const b = Math.max(0, balance); // negative wallet treated as 0 tier for efficiency purposes
-  for(const tier of WALLET_TIERS){
-    if(b <= tier.max) return tier.eff;
-  }
-  return 0;
-}
 
-// Apply wallet efficiency + daily cap to a raw earned amount (in TC, fractional),
-// using CURRENT persisted state. Commits the result to state.tc. Amounts are
-// converted to integer centi-TC before being added, so no float drift accumulates.
-// Returns the net TC (fractional) actually credited.
+// Apply the live productive multiplier + daily cap + hard cap to a raw earned
+// amount (in TC, fractional), using CURRENT persisted state. Commits the
+// result to state.tc. Amounts are converted to integer centi-TC before being
+// added, so no float drift accumulates. Returns the net TC (fractional)
+// actually credited.
 function creditEarnedTC(rawTC){
   rolloverDayIfNeeded();
-  const eff = walletEfficiency(state.tc);
-  let amountC = toCTC(rawTC * eff);
+  const mult = productiveMultiplierForBalance(fromCTC(state.tc));
+  let amountC = toCTC(rawTC * mult);
   const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
   amountC = Math.min(amountC, remainingDaily);
+  const remainingCap = Math.max(0, TC_HARD_CAP - state.tc);
+  amountC = Math.min(amountC, remainingCap);
   if(amountC > 0){
     state.tc += amountC;
     state.dailyEarned += amountC;
   }
+  state.tc = Math.min(state.tc, TC_HARD_CAP); // safety clamp, all TC sources
   return fromCTC(amountC);
 }
 
@@ -305,16 +381,18 @@ function debitSpentTC(rawTC){
 // Pure (non-mutating) calculation of what a raw earned amount WOULD net right now,
 // for live display purposes only. Mirrors creditEarnedTC's rules without committing.
 function previewEarnedTC(rawTC){
-  const eff = walletEfficiency(state.tc);
-  let amountC = toCTC(rawTC * eff);
+  const mult = productiveMultiplierForBalance(fromCTC(state.tc));
+  let amountC = toCTC(rawTC * mult);
   const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
   amountC = Math.min(amountC, remainingDaily);
+  const remainingCap = Math.max(0, TC_HARD_CAP - state.tc);
+  amountC = Math.min(amountC, remainingCap);
   return fromCTC(Math.max(0, amountC));
 }
 
 /* ============ TASKS ============ */
 let tasks = [];
-const CHECKLIST_REWARD = 3; // fixed +3 TC per task, per rules.md "Normal" tier simplified to a single flat reward
+const STAR_REWARDS = { 1:3.00, 2:4.50, 3:5.00, 4:7.80, 5:10.00 }; // TC reward by star rating (1-5)
 
 async function loadTasks(){
   tasks = await idbGetAll('tasks');
@@ -345,7 +423,7 @@ function fmtCountdownTime(totalSeconds){
 }
 
 function startStopwatch(catKey){
-  if(state.activeTimer) stopActiveTimer(); // auto-stop current
+  if(state.activeTimer) stopActiveTimer(false, {silent:true}); // switching activities: interrupt, don't chain into auto-break
   state.activeTimer = {type:'stopwatch', category:catKey, started_at: Date.now()};
   recordHistoryPoint();
   saveState();
@@ -353,7 +431,7 @@ function startStopwatch(catKey){
 }
 
 function startCountdown(catKey){
-  if(state.activeTimer) stopActiveTimer();
+  if(state.activeTimer) stopActiveTimer(false, {silent:true}); // switching activities: interrupt, don't chain into auto-break
   const cat = COUNTDOWN.find(c=>c.key===catKey);
   state.activeTimer = {type:'countdown', category:catKey, started_at: Date.now(), duration: cat.durationMin*60000};
   recordHistoryPoint();
@@ -361,32 +439,54 @@ function startCountdown(catKey){
   render();
 }
 
-// Stops whatever is active, applying TC. If `expired` true, countdown reached 0 naturally.
-function stopActiveTimer(expired=false){
+// Stops whatever is active.
+//  - expired: true when a countdown reached 0 naturally (full duration charged; never chains into auto-break).
+//  - opts.silent: true when this stop is happening BECAUSE the user is switching straight into a
+//    different activity (called from startStopwatch/startCountdown). In that case:
+//      * if the interrupted timer was Break, cancel it for free (no charge for the unfinished break)
+//      * never auto-chain into another Break (a new activity is already being started)
+//    A non-silent stop is the user explicitly clicking the active row to turn it off — that always
+//    applies the normal elapsed TC change, and if the stopped activity wasn't Break itself, it
+//    automatically starts the Break countdown next.
+function stopActiveTimer(expired=false, opts={}){
+  const silent = !!opts.silent;
   const t = state.activeTimer;
   if(!t) return;
   const now = Date.now();
+  const wasBreak = (t.type === 'countdown' && t.category === 'break');
+  const freeCancelBreak = silent && wasBreak && !expired;
 
-  if(t.type === 'stopwatch'){
-    const cat = STOPWATCH.find(c=>c.key===t.category);
-    const elapsedMin = (now - t.started_at)/60000;
-    const raw = elapsedMin * cat.mult;
-    creditEarnedTC(raw);
-  } else {
-    const cat = COUNTDOWN.find(c=>c.key===t.category);
-    let elapsedMs;
-    if(expired){
-      elapsedMs = t.duration; // full duration
+  if(!freeCancelBreak){
+    if(t.type === 'stopwatch'){
+      const cat = STOPWATCH.find(c=>c.key===t.category);
+      const elapsedMin = (now - t.started_at)/60000;
+      const raw = elapsedMin * cat.mult;
+      creditEarnedTC(raw);
     } else {
-      elapsedMs = Math.min(now - t.started_at, t.duration);
+      const cat = COUNTDOWN.find(c=>c.key===t.category);
+      // Break's multiplier is dynamic (based on the current TC balance);
+      // all other countdown categories keep their static predefined multiplier.
+      const effMult = effectiveCountdownMult(cat, fromCTC(state.tc));
+      let elapsedMs;
+      if(expired){
+        elapsedMs = t.duration; // full duration
+      } else {
+        elapsedMs = Math.min(now - t.started_at, t.duration);
+      }
+      const elapsedMin = elapsedMs/60000;
+      const raw = elapsedMin * effMult;
+      debitSpentTC(raw);
     }
-    const elapsedMin = elapsedMs/60000;
-    const raw = elapsedMin * cat.mult;
-    debitSpentTC(raw);
   }
   state.activeTimer = null;
   recordHistoryPoint();
   saveState();
+
+  // Auto-start Break: only for an explicit user stop (not a switch, not a natural expiry),
+  // and only when the timer that was just stopped wasn't Break itself.
+  if(!silent && !expired && !wasBreak){
+    startCountdown('break');
+  }
 }
 
 function tick(){
@@ -470,9 +570,10 @@ function liveBalanceTC(){
     return baseTC + previewEarnedTC(raw);
   } else {
     const cat = COUNTDOWN.find(c=>c.key===t.category);
+    const effMult = effectiveCountdownMult(cat, baseTC);
     const elapsedMs = Math.min(Date.now() - t.started_at, t.duration);
     const elapsedMin = elapsedMs/60000;
-    const raw = elapsedMin * cat.mult;
+    const raw = elapsedMin * effMult;
     return baseTC - raw;
   }
 }
@@ -543,32 +644,81 @@ function drawGraph(){
   svg.innerHTML = `<polyline points="${coords}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
 }
 
+/* ---- Hidden TC editing (double-click the balance) ---- */
+let tcEditOpen = false;
+const tcBalanceEl = document.getElementById('tcBalance');
+function openTCEdit(){
+  if(tcEditOpen) return;
+  tcEditOpen = true;
+  const currentVal = fromCTC(state.tc).toFixed(2);
+  // Field starts BLANK (current value shown only as a placeholder) so there is
+  // zero ambiguity: whatever the user types is the new balance, not an addition.
+  tcBalanceEl.innerHTML = `<input type="text" inputmode="decimal" class="tcEditInput" id="tcEditInput" value="" placeholder="${currentVal}">`;
+  const input = document.getElementById('tcEditInput');
+  input.focus();
+
+  let resolved = false;
+  function finish(save){
+    if(resolved) return;
+    resolved = true;
+    tcEditOpen = false;
+    if(save){
+      const raw = input.value.trim();
+      const num = Number(raw);
+      if(raw !== '' && Number.isFinite(num)){
+        // REPLACE the stored balance entirely — never add to the existing value.
+        state.tc = toCTC(num);
+        recordHistoryPoint();
+        saveState();
+      }
+      // empty/invalid/non-numeric input is silently rejected — balance stays unchanged
+    }
+    render();
+  }
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', ()=> finish(true));
+}
+tcBalanceEl.addEventListener('dblclick', openTCEdit);
+
 function render(){
   // Header
   const balEl = document.getElementById('tcBalance');
   const liveTC = liveBalanceTC();
-  balEl.textContent = `${liveTC.toFixed(2)} TC`;
-  balEl.classList.toggle('neg', liveTC < 0);
+  if(!tcEditOpen){
+    balEl.textContent = `${liveTC.toFixed(2)} TC`;
+    balEl.classList.toggle('neg', liveTC < 0);
+  }
   const totalMin = Math.abs(liveTC);
   const h = Math.floor(totalMin/60), m = Math.floor(totalMin%60);
   document.getElementById('tcTime').textContent = `= ${liveTC<0?'-':''}${h}h ${m}m`;
   document.getElementById('dailyEarned').textContent = fromCTC(Math.min(state.dailyEarned, DAILY_CAP)).toFixed(2);
-  document.getElementById('efficiency').textContent = `${Math.round(walletEfficiency(state.tc)*100)}%`;
 
   // Timer rows
   document.querySelectorAll('#stopwatchPanel .row').forEach(row=>{
     const key = row.dataset.key;
+    const cat = STOPWATCH.find(c=>c.key===key);
     const active = state.activeTimer && state.activeTimer.type==='stopwatch' && state.activeTimer.category===key;
     row.classList.toggle('active', !!active);
     const valEl = row.querySelector('.rowValue');
     if(active){
-      const cat = STOPWATCH.find(c=>c.key===key);
       const elapsedMs = Date.now() - state.activeTimer.started_at;
       const raw = (elapsedMs/60000) * cat.mult;
       valEl.textContent = `${fmtElapsed(elapsedMs)}`;
-      valEl.title = `+${Math.round(raw)} TC so far`;
+      valEl.title = `+${previewEarnedTC(raw).toFixed(2)} TC so far`;
     } else {
       valEl.textContent = '—';
+    }
+
+    // Live productive multiplier: reward for every stopwatch activity scales
+    // with the current TC balance, so the rate label updates continuously.
+    const prodMult = productiveMultiplierForBalance(liveTC);
+    const effMult = cat.mult * prodMult;
+    const rateEl = row.querySelector('.rowRate');
+    if(rateEl){
+      rateEl.textContent = `${effMult.toFixed(2)}× — +${(effMult*60).toFixed(2)} TC/hr`;
     }
   });
 
@@ -579,10 +729,19 @@ function render(){
     row.classList.toggle('active', !!active);
     row.classList.toggle('spend-mode', !!active);
     const valEl = row.querySelector('.rowValue');
-    // "Time until 0 TC" at this activity's spend rate, computed from the live
-    // balance (not the countdown's actual predefined duration/remaining time).
-    const secondsToZero = liveTC > 0 ? (liveTC / cat.mult) * 60 : 0;
+    const effMult = effectiveCountdownMult(cat, liveTC);
+    // "Time until 0 TC" at this activity's current effective spend rate,
+    // computed from the live balance — not the countdown's actual duration.
+    const secondsToZero = liveTC > 0 ? (liveTC / effMult) * 60 : 0;
     valEl.textContent = fmtCountdownTime(secondsToZero);
+
+    // All countdown rate labels are live — every category's cost depends on
+    // the current TC balance (Break via its own curve, others via the
+    // leisure multiplier), so all of them update continuously.
+    const rateEl = row.querySelector('.rowRate');
+    if(rateEl){
+      rateEl.textContent = `${effMult.toFixed(2)}× — −${(effMult*60).toFixed(2)} TC/hr`;
+    }
   });
 
   renderTasks();
@@ -599,7 +758,7 @@ function renderTasks(){
     row.innerHTML = `
       <input type="checkbox" ${task.done?'checked':''}>
       <div class="taskName">${escapeHTML(task.name)}</div>
-      <div class="taskReward">+${task.reward} TC</div>
+      <div class="taskReward">+${task.reward.toFixed(2)} TC</div>
       <div class="taskDel">✕</div>
     `;
     row.querySelector('input').addEventListener('change', ()=>toggleTask(task.id));
@@ -624,9 +783,14 @@ async function toggleTask(id){
   if(!task) return;
   task.done = !task.done;
   if(task.done){
-    state.tc += toCTC(CHECKLIST_REWARD);
+    // Clamp to the hard cap (applies to all TC sources); remember exactly
+    // what was credited so unchecking reverses the correct amount.
+    const before = state.tc;
+    state.tc = Math.min(state.tc + toCTC(task.reward), TC_HARD_CAP);
+    task.awardedC = state.tc - before;
   } else {
-    state.tc -= toCTC(CHECKLIST_REWARD);
+    state.tc -= (task.awardedC || toCTC(task.reward));
+    task.awardedC = 0;
   }
   recordHistoryPoint();
   await idbPut('tasks', task);
@@ -638,7 +802,7 @@ async function deleteTask(id){
   const task = tasks.find(t=>t.id===id);
   if(!task) return;
   if(task.done){
-    state.tc -= toCTC(CHECKLIST_REWARD); // remove awarded TC if it was completed
+    state.tc -= (task.awardedC || toCTC(task.reward)); // remove awarded TC if it was completed
     recordHistoryPoint();
     await saveState();
   }
@@ -647,14 +811,34 @@ async function deleteTask(id){
   render();
 }
 
+/* ---- Star selector (checklist reward picker) ---- */
+let selectedStars = 1;
+const starEls = document.querySelectorAll('#starSelector .star');
+function renderStarSelector(){
+  starEls.forEach(el=>{
+    const n = parseInt(el.dataset.n, 10);
+    el.classList.toggle('filled', n <= selectedStars);
+  });
+}
+starEls.forEach(el=>{
+  el.addEventListener('click', ()=>{
+    selectedStars = parseInt(el.dataset.n, 10);
+    renderStarSelector();
+  });
+});
+renderStarSelector();
+
 const newTaskInput = document.getElementById('newTaskInput');
 async function addTaskFromInput(){
   const name = newTaskInput.value.trim();
   if(!name) return;
-  const task = { id: 'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), name, reward:CHECKLIST_REWARD, done:false, createdAt: Date.now() };
+  const reward = STAR_REWARDS[selectedStars];
+  const task = { id: 'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), name, reward, stars:selectedStars, done:false, createdAt: Date.now() };
   tasks.push(task);
   await idbPut('tasks', task);
   newTaskInput.value = '';
+  selectedStars = 1;
+  renderStarSelector();
   newTaskInput.focus();
   render();
 }
