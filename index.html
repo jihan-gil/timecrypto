@@ -36,8 +36,7 @@
   }
   .tcEditInput::placeholder{ color:var(--tc-dim); opacity:0.6; }
   #tcTime{ font-size:12px; color:var(--sub); margin-top:4px;}
-  #tcMeta{ display:flex; gap:16px; margin-top:6px; font-size:11px; color:var(--tc-dim); font-family:var(--mono);}
-  #tcMeta span b{color:var(--sub); font-weight:600;}
+  #tcEfficiency{ font-size:12px; color:var(--tc-dim); margin-top:2px; font-family:var(--mono); }
 
   /* GRAPH */
   #graphWrap{
@@ -116,9 +115,7 @@
 <div id="header">
   <div id="tcBalance">0 TC</div>
   <div id="tcTime">= 0h 0m</div>
-  <div id="tcMeta">
-    <span>Today earned: <b id="dailyEarned">0</b>/180 TC</span>
-  </div>
+  <div id="tcEfficiency">Efficiency: 1.00×</div>
 </div>
 
 <div id="graphWrap">
@@ -163,19 +160,19 @@
 <script>
 /* ============ CONSTANTS FROM rules.md ============ */
 const STOPWATCH = [
-  {key:'study',    name:'Study',          mult:1.25},
-  {key:'work',     name:'Work / Projects',mult:1.15},
+  {key:'study',    name:'Study',          mult:1.35},
+  {key:'work',     name:'Work / Projects',mult:1.25},
   {key:'exercise', name:'Exercise',       mult:1.10},
-  {key:'chores',   name:'Chores',         mult:1.00},
-  {key:'creative', name:'Creative',       mult:0.95},
-  {key:'reading',  name:'Reading',        mult:0.95},
+  {key:'chores',   name:'Chores',         mult:0.95},
+  {key:'creative', name:'Creative',       mult:1.00},
+  {key:'reading',  name:'Reading',        mult:0.90},
 ];
 const COUNTDOWN = [
-  {key:'break',    name:'Break',    mult:0.50, durationMin:15},
-  {key:'watching', name:'Watching', mult:0.90, durationMin:30},
-  {key:'gaming',   name:'Gaming',   mult:1.00, durationMin:30},
-  {key:'browsing', name:'Browsing', mult:1.15, durationMin:20},
-  {key:'outside',  name:'Outside',  mult:0.35, durationMin:45},
+  {key:'break',    name:'Break',    mult:0.40, durationMin:15},
+  {key:'watching', name:'Watching', mult:0.80, durationMin:30},
+  {key:'gaming',   name:'Gaming',   mult:0.90, durationMin:30},
+  {key:'browsing', name:'Browsing', mult:1.05, durationMin:20},
+  {key:'outside',  name:'Outside',  mult:0.50, durationMin:45},
 ];
 
 /* Fixed-point precision: all TC amounts stored internally as integer
@@ -184,75 +181,46 @@ const CTC = 100; // 1 TC = 100 centi-TC
 function toCTC(tc){ return Math.round(tc * CTC); }
 function fromCTC(c){ return c / CTC; }
 
-const DAILY_CAP = toCTC(180);
-
-// Dynamic productive multiplier: piecewise-linear interpolation between
-// breakpoints, based on the CURRENT TC balance. Low balance = higher reward;
-// high balance = lower reward. Applies to all stopwatch (productive) activities.
-// effective_reward = base_reward × productiveMultiplierForBalance(balance)
-const PRODUCTIVE_MULT_BREAKPOINTS = [
-  {tc:0,   mult:1.25},
-  {tc:100, mult:1.20},
-  {tc:200, mult:1.00},
-  {tc:300, mult:0.80},
-  {tc:400, mult:0.60},
+/* ============ CENTRALIZED ECONOMY: EFFICIENCY ============
+   TC -> Efficiency -> Timers -> TC -> repeat.
+   Efficiency is the single variable controlling both earning and spending:
+     Earning: TC_per_hour = base_TC_per_hour × base_multiplier × efficiency
+     Spending: TC_per_hour = base_TC_per_hour × base_multiplier ÷ efficiency
+   Higher TC -> lower efficiency. Lower/negative TC -> higher efficiency.
+   TC = 0 -> efficiency = 100%. No hard cap, no daily cap, no decay. */
+const EFFICIENCY_ANCHORS = [
+  {tc:-300, eff:1.40},
+  {tc:-100, eff:1.20},
+  {tc:0,    eff:1.00},
+  {tc:100,  eff:0.94},
+  {tc:250,  eff:0.84},
+  {tc:500,  eff:0.72},
+  {tc:1000, eff:0.60},
 ];
 
-function productiveMultiplierForBalance(balanceTC){
-  const b = Math.max(0, balanceTC);
-  if(b >= 400) return 0.60;
-  for(let i=0; i<PRODUCTIVE_MULT_BREAKPOINTS.length-1; i++){
-    const p0 = PRODUCTIVE_MULT_BREAKPOINTS[i], p1 = PRODUCTIVE_MULT_BREAKPOINTS[i+1];
-    if(b >= p0.tc && b <= p1.tc){
-      const t = (p1.tc === p0.tc) ? 0 : (b - p0.tc) / (p1.tc - p0.tc);
-      return p0.mult + t * (p1.mult - p0.mult);
-    }
-  }
-  return 0.60;
+// easeOutQuart: fast movement early in the segment, leveling off toward the
+// far end. t is normalized progress [0,1] through the current anchor segment.
+function easeOutQuart(t){
+  return 1 - Math.pow(1 - t, 4);
 }
 
-// Hard cap: TC may never exceed this, from any source.
-const TC_HARD_CAP = toCTC(400);
-
-// Dynamic countdown cost curves: piecewise-linear interpolation between
-// breakpoints, based on the CURRENT TC balance. Larger reserves cost more.
-// Break's curve values ARE its effective multiplier directly. All other
-// categories keep their static base cost (cat.mult) unchanged and apply
-// their own curve as a multiplier on top: effective = base_cost × curve(TC).
-// Tuned so a full 400 TC wallet funds roughly: Break 5.0h, Watching 4.4h,
-// Gaming 4.2h, Browsing 3.0h, Outside 8.0h.
-const COUNTDOWN_MULT_CURVES = {
-  break:    [{tc:0,mult:0.35},{tc:100,mult:0.50},{tc:200,mult:0.80},{tc:300,mult:1.50},{tc:400,mult:2.67}],
-  watching: [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.15},{tc:300,mult:1.30},{tc:350,mult:1.50},{tc:400,mult:1.68}],
-  gaming:   [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.12},{tc:300,mult:1.28},{tc:350,mult:1.45},{tc:400,mult:1.59}],
-  browsing: [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.20},{tc:300,mult:1.45},{tc:350,mult:1.70},{tc:400,mult:1.93}],
-  outside:  [{tc:0,mult:1.00},{tc:200,mult:1.00},{tc:250,mult:1.30},{tc:300,mult:1.70},{tc:350,mult:2.05},{tc:400,mult:2.38}],
-};
-
-// Piecewise-linear interpolation across an arbitrary breakpoint curve.
-// Clamps to the first/last breakpoint's value outside its range.
-function interpolateCurve(curve, balanceTC){
-  const first = curve[0], last = curve[curve.length-1];
-  if(balanceTC <= first.tc) return first.mult;
-  if(balanceTC >= last.tc) return last.mult;
-  for(let i=0; i<curve.length-1; i++){
-    const p0 = curve[i], p1 = curve[i+1];
+// The single source of truth for the entire economy. Given the CURRENT TC
+// balance (whole TC, fractional), returns the current efficiency multiplier.
+// Interpolates between anchors using easeOutQuart easing; clamps to the first/
+// last anchor's value outside the anchor range.
+function efficiencyForBalance(balanceTC){
+  const first = EFFICIENCY_ANCHORS[0], last = EFFICIENCY_ANCHORS[EFFICIENCY_ANCHORS.length-1];
+  if(balanceTC <= first.tc) return first.eff;
+  if(balanceTC >= last.tc) return last.eff;
+  for(let i=0; i<EFFICIENCY_ANCHORS.length-1; i++){
+    const p0 = EFFICIENCY_ANCHORS[i], p1 = EFFICIENCY_ANCHORS[i+1];
     if(balanceTC >= p0.tc && balanceTC <= p1.tc){
       const t = (p1.tc === p0.tc) ? 0 : (balanceTC - p0.tc) / (p1.tc - p0.tc);
-      return p0.mult + t * (p1.mult - p0.mult);
+      const eased = easeOutQuart(t);
+      return p0.eff + eased * (p1.eff - p0.eff);
     }
   }
-  return last.mult;
-}
-
-// Unified effective multiplier for any countdown category at the current balance.
-// Break's curve is the full effective multiplier; other categories multiply
-// their unchanged base cost (cat.mult) by their own curve value.
-function effectiveCountdownMult(cat, balanceTC){
-  const curve = COUNTDOWN_MULT_CURVES[cat.key];
-  if(!curve) return cat.mult;
-  const curveVal = interpolateCurve(curve, balanceTC);
-  return (cat.key === 'break') ? curveVal : cat.mult * curveVal;
+  return last.eff;
 }
 
 /* ============ INDEXEDDB LAYER ============ */
@@ -308,8 +276,6 @@ function idbGetAll(store){
 let state = {
   id:'main',
   tc: 0,                 // BASE balance, integer centi-TC (hundredths). Persisted only on commit.
-  dailyEarned: 0,        // integer centi-TC
-  dailyDate: todayStr(),
   activeTimer: null,     // {type:'stopwatch'|'countdown', category, started_at, duration?}
   history: [],           // [{t: timestamp, tc: fractional TC}], recorded at meaningful events only
 };
@@ -326,68 +292,43 @@ function recordHistoryPoint(){
   state.history = state.history.filter(p => p.t >= cutoff);
 }
 
-function todayStr(){
-  const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
-}
-
 async function loadState(){
   const s = await idbGet('state','main');
   if(s) state = s;
   else await idbPut('state', state);
   if(!Array.isArray(state.history)) state.history = [];
-  rolloverDayIfNeeded();
 }
 async function saveState(){
   await idbPut('state', {...state});
 }
-function rolloverDayIfNeeded(){
-  const t = todayStr();
-  if(state.dailyDate !== t){
-    state.dailyDate = t;
-    state.dailyEarned = 0;
-  }
-}
 
 /* ============ ECONOMY ============ */
+// TC changes flow through the single centralized Efficiency variable (see above).
+// Earning: TC_per_hour = base_TC_per_hour × base_multiplier × efficiency
+// Spending: TC_per_hour = base_TC_per_hour × base_multiplier ÷ efficiency
+// Efficiency is evaluated against the CURRENT balance at the moment of the
+// calculation, so it's always live/continuous. No caps, no decay, no clamps —
+// TC may go negative or grow without bound; checklist rewards and manual
+// editing are the only other places TC changes.
 
-// Apply the live productive multiplier + daily cap + hard cap to a raw earned
-// amount (in TC, fractional), using CURRENT persisted state. Commits the
-// result to state.tc. Amounts are converted to integer centi-TC before being
-// added, so no float drift accumulates. Returns the net TC (fractional)
-// actually credited.
+// rawTC = elapsedMin × cat.mult (the BASE earn amount, before efficiency).
+// Applies the current efficiency, converts to fixed-point, and credits it.
+// Returns the net TC actually credited.
 function creditEarnedTC(rawTC){
-  rolloverDayIfNeeded();
-  const mult = productiveMultiplierForBalance(fromCTC(state.tc));
-  let amountC = toCTC(rawTC * mult);
-  const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
-  amountC = Math.min(amountC, remainingDaily);
-  const remainingCap = Math.max(0, TC_HARD_CAP - state.tc);
-  amountC = Math.min(amountC, remainingCap);
-  if(amountC > 0){
-    state.tc += amountC;
-    state.dailyEarned += amountC;
-  }
-  state.tc = Math.min(state.tc, TC_HARD_CAP); // safety clamp, all TC sources
+  const eff = efficiencyForBalance(fromCTC(state.tc));
+  const amountC = toCTC(rawTC * eff);
+  state.tc += amountC;
   return fromCTC(amountC);
 }
 
+// rawTC = elapsedMin × cat.mult (the BASE spend amount, before efficiency).
+// Applies the current efficiency (division — lower efficiency costs MORE),
+// converts to fixed-point, and debits it. Returns the TC actually debited.
 function debitSpentTC(rawTC){
-  const amountC = toCTC(rawTC);
+  const eff = efficiencyForBalance(fromCTC(state.tc));
+  const amountC = toCTC(rawTC / eff);
   state.tc -= amountC;
   return fromCTC(amountC);
-}
-
-// Pure (non-mutating) calculation of what a raw earned amount WOULD net right now,
-// for live display purposes only. Mirrors creditEarnedTC's rules without committing.
-function previewEarnedTC(rawTC){
-  const mult = productiveMultiplierForBalance(fromCTC(state.tc));
-  let amountC = toCTC(rawTC * mult);
-  const remainingDaily = Math.max(0, DAILY_CAP - state.dailyEarned);
-  amountC = Math.min(amountC, remainingDaily);
-  const remainingCap = Math.max(0, TC_HARD_CAP - state.tc);
-  amountC = Math.min(amountC, remainingCap);
-  return fromCTC(Math.max(0, amountC));
 }
 
 /* ============ TASKS ============ */
@@ -464,9 +405,6 @@ function stopActiveTimer(expired=false, opts={}){
       creditEarnedTC(raw);
     } else {
       const cat = COUNTDOWN.find(c=>c.key===t.category);
-      // Break's multiplier is dynamic (based on the current TC balance);
-      // all other countdown categories keep their static predefined multiplier.
-      const effMult = effectiveCountdownMult(cat, fromCTC(state.tc));
       let elapsedMs;
       if(expired){
         elapsedMs = t.duration; // full duration
@@ -474,7 +412,7 @@ function stopActiveTimer(expired=false, opts={}){
         elapsedMs = Math.min(now - t.started_at, t.duration);
       }
       const elapsedMin = elapsedMs/60000;
-      const raw = elapsedMin * effMult;
+      const raw = elapsedMin * cat.mult;
       debitSpentTC(raw);
     }
   }
@@ -517,7 +455,7 @@ function buildStaticRows(){
     row.innerHTML = `
       <div class="rowLeft">
         <div class="rowName">${cat.name}</div>
-        <div class="rowRate">${cat.mult}× — +${Math.round(cat.mult*60)} TC/hr</div>
+        <div class="rowRate">${cat.mult.toFixed(2)}× (${cat.mult.toFixed(2)}×) - +${(cat.mult*60).toFixed(2)} TC/hr</div>
       </div>
       <div class="rowValue">—</div>
     `;
@@ -539,7 +477,7 @@ function buildStaticRows(){
     row.innerHTML = `
       <div class="rowLeft">
         <div class="rowName">${cat.name}</div>
-        <div class="rowRate">${cat.mult}× — −${Math.round(cat.mult*60)} TC/hr</div>
+        <div class="rowRate">${cat.mult.toFixed(2)}× (${cat.mult.toFixed(2)}×) - -${(cat.mult*60).toFixed(2)} TC/hr</div>
       </div>
       <div class="rowValue">—</div>
     `;
@@ -563,17 +501,21 @@ function liveBalanceTC(){
   const t = state.activeTimer;
   if(!t) return baseTC;
 
+  // Efficiency is evaluated against the current base balance so the live
+  // display reacts immediately if the balance changes for any other reason
+  // (e.g. a checklist reward) while a timer is running.
+  const eff = efficiencyForBalance(baseTC);
+
   if(t.type === 'stopwatch'){
     const cat = STOPWATCH.find(c=>c.key===t.category);
     const elapsedMin = (Date.now() - t.started_at)/60000;
-    const raw = elapsedMin * cat.mult;
-    return baseTC + previewEarnedTC(raw);
+    const raw = elapsedMin * cat.mult * eff;
+    return baseTC + fromCTC(toCTC(raw)); // same rounding creditEarnedTC will apply at commit
   } else {
     const cat = COUNTDOWN.find(c=>c.key===t.category);
-    const effMult = effectiveCountdownMult(cat, baseTC);
     const elapsedMs = Math.min(Date.now() - t.started_at, t.duration);
     const elapsedMin = elapsedMs/60000;
-    const raw = elapsedMin * effMult;
+    const raw = (elapsedMin * cat.mult) / eff;
     return baseTC - raw;
   }
 }
@@ -694,7 +636,11 @@ function render(){
   const totalMin = Math.abs(liveTC);
   const h = Math.floor(totalMin/60), m = Math.floor(totalMin%60);
   document.getElementById('tcTime').textContent = `= ${liveTC<0?'-':''}${h}h ${m}m`;
-  document.getElementById('dailyEarned').textContent = fromCTC(Math.min(state.dailyEarned, DAILY_CAP)).toFixed(2);
+
+  // The single centralized efficiency value, evaluated against the current
+  // live balance so every rate label below reacts immediately to it.
+  const eff = efficiencyForBalance(liveTC);
+  document.getElementById('tcEfficiency').textContent = `Efficiency: ${eff.toFixed(2)}×`;
 
   // Timer rows
   document.querySelectorAll('#stopwatchPanel .row').forEach(row=>{
@@ -705,20 +651,17 @@ function render(){
     const valEl = row.querySelector('.rowValue');
     if(active){
       const elapsedMs = Date.now() - state.activeTimer.started_at;
-      const raw = (elapsedMs/60000) * cat.mult;
+      const raw = (elapsedMs/60000) * cat.mult * eff;
       valEl.textContent = `${fmtElapsed(elapsedMs)}`;
-      valEl.title = `+${previewEarnedTC(raw).toFixed(2)} TC so far`;
+      valEl.title = `+${fromCTC(toCTC(raw)).toFixed(2)} TC so far`;
     } else {
       valEl.textContent = '—';
     }
-
-    // Live productive multiplier: reward for every stopwatch activity scales
-    // with the current TC balance, so the rate label updates continuously.
-    const prodMult = productiveMultiplierForBalance(liveTC);
-    const effMult = cat.mult * prodMult;
+    // Earning: base × multiplier × efficiency — live, reacts to the current balance.
+    const effRate = cat.mult * eff;
     const rateEl = row.querySelector('.rowRate');
     if(rateEl){
-      rateEl.textContent = `${effMult.toFixed(2)}× — +${(effMult*60).toFixed(2)} TC/hr`;
+      rateEl.textContent = `${cat.mult.toFixed(2)}× (${effRate.toFixed(2)}×) - +${(effRate*60).toFixed(2)} TC/hr`;
     }
   });
 
@@ -729,18 +672,14 @@ function render(){
     row.classList.toggle('active', !!active);
     row.classList.toggle('spend-mode', !!active);
     const valEl = row.querySelector('.rowValue');
-    const effMult = effectiveCountdownMult(cat, liveTC);
-    // "Time until 0 TC" at this activity's current effective spend rate,
-    // computed from the live balance — not the countdown's actual duration.
-    const secondsToZero = liveTC > 0 ? (liveTC / effMult) * 60 : 0;
+    // Spending: base × multiplier ÷ efficiency. "Time until 0 TC" at this
+    // activity's current effective spend rate, computed from the live balance.
+    const effRate = cat.mult / eff;
+    const secondsToZero = liveTC > 0 ? (liveTC / effRate) * 60 : 0;
     valEl.textContent = fmtCountdownTime(secondsToZero);
-
-    // All countdown rate labels are live — every category's cost depends on
-    // the current TC balance (Break via its own curve, others via the
-    // leisure multiplier), so all of them update continuously.
     const rateEl = row.querySelector('.rowRate');
     if(rateEl){
-      rateEl.textContent = `${effMult.toFixed(2)}× — −${(effMult*60).toFixed(2)} TC/hr`;
+      rateEl.textContent = `${cat.mult.toFixed(2)}× (${effRate.toFixed(2)}×) - -${(effRate*60).toFixed(2)} TC/hr`;
     }
   });
 
@@ -783,14 +722,9 @@ async function toggleTask(id){
   if(!task) return;
   task.done = !task.done;
   if(task.done){
-    // Clamp to the hard cap (applies to all TC sources); remember exactly
-    // what was credited so unchecking reverses the correct amount.
-    const before = state.tc;
-    state.tc = Math.min(state.tc + toCTC(task.reward), TC_HARD_CAP);
-    task.awardedC = state.tc - before;
+    state.tc += toCTC(task.reward);
   } else {
-    state.tc -= (task.awardedC || toCTC(task.reward));
-    task.awardedC = 0;
+    state.tc -= toCTC(task.reward);
   }
   recordHistoryPoint();
   await idbPut('tasks', task);
@@ -802,7 +736,7 @@ async function deleteTask(id){
   const task = tasks.find(t=>t.id===id);
   if(!task) return;
   if(task.done){
-    state.tc -= (task.awardedC || toCTC(task.reward)); // remove awarded TC if it was completed
+    state.tc -= toCTC(task.reward); // remove awarded TC if it was completed
     recordHistoryPoint();
     await saveState();
   }
