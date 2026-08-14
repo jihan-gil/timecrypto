@@ -2,802 +2,1021 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>TimeCrypto</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weekly Timetable — Erica, Erinn & Erich</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0f1215; --panel:#171b1f; --line:#262b30;
-    --tc:#e9e2d0; --tc-dim:#8a8f95;
-    --earn:#5fbf8f; --spend:#d97757;
-    --text:#e6e6e6; --sub:#9aa0a6;
-    --mono: 'SF Mono', 'Consolas', monospace;
+    --bg: #101019;
+    --bg-2: #14141f;
+    --panel: #191927;
+    --panel-2: #1e1e2e;
+    --hairline: rgba(255,255,255,0.075);
+    --hairline-strong: rgba(255,255,255,0.14);
+    --text: #F3F2F8;
+    --text-muted: #9694a6;
+    --text-faint: #5c5a6c;
+    --rail-w: 52px;
+
+    --erica: #5C8DFF;
+    --erica-soft: rgba(92,141,255,0.16);
+    --erica-border: rgba(92,141,255,0.5);
+
+    --erinn: #A374FF;
+    --erinn-soft: rgba(163,116,255,0.16);
+    --erinn-border: rgba(163,116,255,0.5);
+
+    --erich: #FF6FA0;
+    --erich-soft: rgba(255,111,160,0.16);
+    --erich-border: rgba(255,111,160,0.5);
   }
+
   *{box-sizing:border-box; margin:0; padding:0;}
-  html,body{width:600px; max-height:700px; height:auto;}
-  body{
-    background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    display:flex; flex-direction:column; overflow:hidden;
+  html,body{
+    width:100vw; height:100vh; overflow:hidden;
+    background: radial-gradient(ellipse at 20% -10%, #191b2c 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family:'Inter', sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
 
-  /* HEADER */
-  #header{
-    padding:12px 20px 8px; border-bottom:1px solid var(--line);
-    background:linear-gradient(180deg,#181c20,#141719); flex:0 0 auto;
+  .app{
+    width:100vw; height:100vh;
+    display:flex; flex-direction:column;
+    padding: clamp(14px, 2vh, 28px) clamp(16px, 2.4vw, 40px);
   }
-  #tcBalance{
-    font-family:var(--mono); font-size:32px; font-weight:700; color:var(--tc);
-    letter-spacing:-0.5px; line-height:1;
-  }
-  #tcBalance.neg{color:var(--spend);}
-  .tcEditInput{
-    font-family:var(--mono); font-size:32px; font-weight:700; color:var(--tc);
-    letter-spacing:-0.5px; line-height:1; background:transparent; border:none;
-    border-bottom:1px dashed var(--tc-dim); outline:none; width:100%; padding:0;
-  }
-  .tcEditInput::placeholder{ color:var(--tc-dim); opacity:0.6; }
-  #tcTime{ font-size:12px; color:var(--sub); margin-top:4px;}
-  #tcEfficiency{ font-size:12px; color:var(--tc-dim); margin-top:2px; font-family:var(--mono); }
 
-  /* GRAPH */
-  #graphWrap{
-    flex:0 0 auto; padding:8px 20px; border-bottom:1px solid var(--line);
-    background:#121518;
+  /* ---------- HEADER ---------- */
+  .app-header{
+    flex: 0 0 auto;
+    min-height: 10vh;
+    max-height: 15vh;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap: 24px;
+    padding-bottom: clamp(10px, 1.6vh, 20px);
+    border-bottom: 1px solid var(--hairline);
   }
-  #tcGraph{ width:100%; height:56px; display:block; }
-  #graphRangeSelector{ display:flex; gap:4px; margin-top:6px; }
-  .rangeBtn{
-    flex:1; background:#1c2025; border:1px solid var(--line); color:var(--sub);
-    font-size:10.5px; font-family:var(--mono); padding:3px 0; border-radius:5px;
-    cursor:pointer; text-align:center; transition:background .12s, color .12s;
-  }
-  .rangeBtn:hover{ background:#22262c; color:var(--text); }
-  .rangeBtn.active{ background:#20262b; border-color:var(--tc-dim); color:var(--text); font-weight:600; }
 
-  /* TIMERS ROW */
-  #timers{ display:flex; flex:0 0 auto; gap:1px; background:var(--line); border-bottom:1px solid var(--line);}
-  .panel{ flex:1; background:var(--panel); padding:8px 10px 10px; display:flex; flex-direction:column; gap:1px;}
-  .panelTitle{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.8px; color:var(--sub); margin-bottom:4px;}
+  .now-playing{
+    display:flex;
+    flex-direction:column;
+    gap: 5px;
+    min-width: 0;
+    flex: 1 1 340px;
+    max-width: 560px;
+  }
+  .np-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(9px, 0.75vw, 11px);
+    letter-spacing: 0.22em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  .np-content{
+    display:flex; flex-direction:column; gap:6px;
+    transition: opacity .25s ease, transform .25s ease;
+    opacity:1; transform: translateY(0);
+    min-width:0;
+  }
+  .np-content.switching{ opacity:0; transform: translateY(6px); }
 
-  .row{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:6px 8px; border-radius:6px; cursor:pointer;
-    background:#1c2025; border:1px solid transparent;
-    font-size:12.5px; transition:background .12s;
+  .np-title-row{
+    display:flex; align-items:baseline; justify-content:space-between; gap:14px; min-width:0;
   }
-  .row:hover{ background:#22262c; }
-  .row.active{
-    border-color:var(--earn); background:#16261e;
+  .np-subject{
+    font-family:'Fraunces', serif;
+    font-style: italic;
+    font-weight: 500;
+    font-size: clamp(17px, 1.9vw, 26px);
+    letter-spacing: -0.01em;
+    color: var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  .row.active.spend-mode{ border-color:var(--spend); background:#2a1c16; }
-  .rowLeft{ display:flex; flex-direction:column; gap:1px; }
-  .rowName{ font-weight:600; }
-  .rowRate{ font-size:10px; color:var(--tc-dim); font-family:var(--mono);}
-  .rowValue{ font-family:var(--mono); font-size:12.5px; font-weight:700; color:var(--earn); min-width:54px; text-align:right;}
-  .spend-mode .rowValue{ color:var(--spend); }
+  .np-who{
+    display:flex; align-items:center; gap:6px;
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight:600;
+    white-space:nowrap; flex-shrink:0;
+  }
+  .np-who .dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .np-who[data-student="Erica"]{ color: var(--erica); } .np-who[data-student="Erica"] .dot{ background: var(--erica); }
+  .np-who[data-student="Erinn"]{ color: var(--erinn); } .np-who[data-student="Erinn"] .dot{ background: var(--erinn); }
+  .np-who[data-student="Erich"]{ color: var(--erich); } .np-who[data-student="Erich"] .dot{ background: var(--erich); }
 
-  /* CHECKLIST */
-  #checklist{ flex:1 1 auto; min-height:0; padding:10px 20px 12px; display:flex; flex-direction:column; gap:6px; overflow:hidden;}
-  #checklistHead{ display:flex; justify-content:space-between; align-items:center; flex:0 0 auto;}
-  #checklistHead h3{ font-size:11px; text-transform:uppercase; letter-spacing:0.8px; color:var(--sub);}
-  #addTaskRow{ display:flex; gap:6px; flex:0 0 auto; align-items:center; }
-  #starSelector{ display:flex; gap:1px; flex:0 0 auto; padding:0 2px; user-select:none; }
-  #starSelector .star{ font-size:15px; line-height:1; cursor:pointer; color:var(--tc-dim); transition:color .1s; }
-  #starSelector .star.filled{ color:var(--tc); }
-  #starSelector .star:hover{ color:var(--earn); }
-  #newTaskInput{
-    flex:1; background:#171b1f; border:1px solid var(--line); color:var(--text);
-    padding:7px 9px; border-radius:6px; font-size:12.5px; font-family:inherit;
+  .np-meta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(9.5px, 0.7vw, 11.5px);
+    color: var(--text-muted);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
-  #newTaskInput:focus{ outline:none; border-color:var(--earn); }
-  #addTaskBtn{
-    background:#1c2025; border:1px solid var(--line); color:var(--text);
-    font-size:12px; padding:6px 14px; border-radius:6px; cursor:pointer;
-  }
-  #addTaskBtn:hover{ background:#22262c; }
-  #taskList{ overflow-y:auto; flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:6px; }
-  .taskRow{
-    display:flex; align-items:center; gap:10px; padding:7px 10px;
-    background:#171b1f; border:1px solid var(--line); border-radius:6px; font-size:12.5px; flex:0 0 auto;
-  }
-  .taskRow.done{ opacity:0.45; }
-  .taskRow.done .taskName{ text-decoration:line-through; }
-  .taskName{ flex:1; }
-  .taskReward{ font-family:var(--mono); font-size:11.5px; color:var(--earn); }
-  input[type=checkbox]{ width:15px; height:15px; accent-color:var(--earn); cursor:pointer; }
-  .taskDel{ color:var(--tc-dim); cursor:pointer; font-size:13px; padding:0 4px; }
-  .taskDel:hover{ color:var(--spend); }
-  #hiddenToggle{ font-size:10.5px; color:var(--sub); cursor:pointer; flex:0 0 auto; }
 
+  .np-progress-row{ display:flex; flex-direction:column; gap:4px; }
+  .np-track{
+    position:relative;
+    height:3px; border-radius:2px;
+    background: var(--hairline-strong);
+    overflow:hidden;
+  }
+  .np-fill{
+    position:absolute; left:0; top:0; bottom:0;
+    border-radius:2px;
+    background: linear-gradient(to right, var(--np-color, var(--erica)), var(--np-color, var(--erica)));
+    transition: width 1s linear;
+  }
+  .np-fill::after{
+    content:""; position:absolute; right:-3px; top:50%; translate: 0 -50%;
+    width:7px; height:7px; border-radius:50%;
+    background: var(--np-color, var(--erica));
+    box-shadow: 0 0 6px 1px color-mix(in srgb, var(--np-color, var(--erica)) 70%, transparent);
+  }
+  .np-timing-row{
+    display:flex; justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(9px, 0.68vw, 11px);
+    color: var(--text-faint);
+  }
+
+  /* multi-class compact list */
+  .np-multi-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    font-size: clamp(11px, 0.9vw, 14px);
+    min-width:0;
+  }
+  .np-multi-row .np-multi-subject{
+    font-family:'Inter', sans-serif; font-weight:600; color: var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;
+  }
+
+  .legend{
+    display:flex;
+    gap: clamp(6px, 1vw, 14px);
+    flex-wrap: wrap;
+  }
+  .legend-item{
+    display:flex; align-items:center; gap:8px;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    padding: 7px 14px 7px 10px;
+    border-radius: 999px;
+    cursor:pointer;
+    color: var(--text-muted);
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    transition: all .2s ease;
+  }
+  .legend-item .dot{
+    width:9px; height:9px; border-radius:50%;
+    box-shadow: 0 0 0 3px transparent;
+    transition: box-shadow .2s ease;
+  }
+  .legend-item[data-student="Erica"] .dot{ background: var(--erica); }
+  .legend-item[data-student="Erinn"] .dot{ background: var(--erinn); }
+  .legend-item[data-student="Erich"] .dot{ background: var(--erich); }
+  .legend-item.active{ color: var(--text); border-color: var(--hairline-strong); background: var(--panel-2); }
+  .legend-item.active[data-student="Erica"] .dot{ box-shadow: 0 0 0 3px var(--erica-soft); }
+  .legend-item.active[data-student="Erinn"] .dot{ box-shadow: 0 0 0 3px var(--erinn-soft); }
+  .legend-item.active[data-student="Erich"] .dot{ box-shadow: 0 0 0 3px var(--erich-soft); }
+  .legend-item.dimmed{ opacity: 0.35; }
+
+  .flip-btn{
+    display:flex; align-items:center; gap:7px;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    padding: 7px 13px;
+    border-radius: 999px;
+    cursor:pointer;
+    color: var(--text-muted);
+    font-family:'Inter', sans-serif;
+    font-size: clamp(11px, 0.85vw, 13px);
+    font-weight: 500;
+    transition: all .2s ease;
+    flex-shrink:0;
+  }
+  .flip-btn:hover{ color: var(--text); border-color: var(--hairline-strong); background: var(--panel-2); }
+  .flip-btn svg{ flex-shrink:0; transition: transform .3s ease; }
+  .flip-btn.rotated svg{ transform: rotate(180deg); }
+
+  .clock{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(11px, 0.9vw, 14px);
+    color: var(--text-faint);
+    text-align:right;
+    white-space:nowrap;
+  }
+  .clock span{ color: var(--text-muted); }
+
+  /* ---------- GRID ---------- */
+  .grid-wrap{
+    flex: 1 1 auto;
+    min-height: 0;
+    display:flex; flex-direction:column;
+    padding-top: clamp(10px, 1.6vh, 18px);
+  }
+
+  /* crossfade used only when orientation itself changes */
+  #axisTop, .grid-body{
+    transition: opacity .22s ease, transform .22s ease;
+    opacity: 1; transform: translateY(0);
+  }
+  .grid-wrap.switching #axisTop,
+  .grid-wrap.switching .grid-body{
+    opacity: 0; transform: translateY(6px);
+  }
+
+  /* ===== shared axis label styles ===== */
+  #axisTop{
+    display:flex;
+    flex: 0 0 auto;
+    margin-bottom: 6px;
+    position:relative;
+  }
+  /* normal orientation: axisTop = day-name header row */
+  .axis-top-day{
+    flex:1;
+    text-align:center;
+    font-weight:600;
+    font-size: clamp(10px, 0.85vw, 13px);
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline);
+    text-transform: uppercase;
+  }
+  .axis-top-day.is-today{ color: var(--text); }
+  .today-mark{
+    display:inline-block;
+    width:5px; height:5px; border-radius:50%;
+    background: #ffd166;
+    margin-left:6px;
+    vertical-align:middle;
+    box-shadow: 0 0 6px 1px rgba(255,209,102,0.7);
+  }
+  /* rotated orientation: axisTop = hourly time header, absolutely positioned ticks */
+  #axisTop.rotated{
+    height: 28px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .axis-top-hour{
+    position:absolute;
+    top:0;
+    transform: translateX(-50%);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(9px, 0.7vw, 11px);
+    color: var(--text-faint);
+  }
+
+  .grid-body{
+    flex: 1 1 auto;
+    min-height:0;
+    display:flex;
+    position:relative;
+  }
+
+  /* ===== axis-side (rail) — signature element, shared between orientations ===== */
+  #axisSide{
+    flex: 0 0 var(--rail-w);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .rail-thread{
+    position:absolute;
+    left: 24px; top:0; bottom:0;
+    width:1px;
+    background: linear-gradient(to bottom, transparent, var(--hairline-strong) 8%, var(--hairline-strong) 92%, transparent);
+  }
+  .rail-thread.horizontal{
+    left:0; right:0; top:14px; bottom:auto; width:auto; height:1px;
+    background: linear-gradient(to right, transparent, var(--hairline-strong) 8%, var(--hairline-strong) 92%, transparent);
+  }
+  /* normal: absolutely-positioned hour ticks down the rail */
+  .rail-tick-time{
+    position:absolute;
+    left:0; width:100%;
+    transform: translateY(-50%);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(9px, 0.7vw, 11px);
+    color: var(--text-faint);
+    text-align:left;
+  }
+  .rail-tick-time .node{
+    display:inline-block;
+    width:5px; height:5px; border-radius:50%;
+    background: var(--hairline-strong);
+    margin-right:6px;
+    position:relative; top:-1px;
+  }
+  /* rotated: day labels stacked as equal flex rows */
+  .rail-day{
+    flex:1;
+    display:flex; align-items:center;
+    font-weight:600;
+    font-size: clamp(10px, 0.85vw, 13px);
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .rail-day.is-today{ color: var(--text); }
+  .rail-day:last-child{ border-bottom:none; }
+
+  /* ===== tracks (days x7, normal=row of columns / rotated=column of rows) ===== */
+  #tracks{
+    flex:1;
+    display:flex;
+    position:relative;
+  }
+  #tracks.rotated{ flex-direction:column; }
+
+  .track{
+    flex:1;
+    position:relative;
+    border-left: 1px solid var(--hairline);
+    overflow:hidden; /* hard clip — a day's boundary is immutable; cards can never bleed into a neighboring day */
+  }
+  #tracks:not(.rotated) .track{
+    background-image: repeating-linear-gradient(
+      to bottom, rgba(255,255,255,0.032) 0, rgba(255,255,255,0.032) 1px,
+      transparent 1px, transparent calc(100% / 13)
+    );
+  }
+  #tracks:not(.rotated) .track:last-child{ border-right: 1px solid var(--hairline); }
+
+  #tracks.rotated .track{
+    border-left:none;
+    border-top: 1px solid var(--hairline);
+    background-image: repeating-linear-gradient(
+      to right, rgba(255,255,255,0.032) 0, rgba(255,255,255,0.032) 1px,
+      transparent 1px, transparent calc(100% / 13)
+    );
+  }
+  #tracks.rotated .track:last-child{ border-bottom: 1px solid var(--hairline); }
+
+  .track.is-today{ background-color: rgba(255,255,255,0.018); }
+
+  .now-line{
+    position:absolute;
+    z-index:5;
+    opacity:0.85;
+  }
+  .now-line.vertical{
+    left:0; right:0; top:0; height:0;
+    border-top: 1.5px dashed #ffd166;
+  }
+  .now-line.vertical::before{
+    content:""; position:absolute; left:-4px; top:-4px;
+    width:8px; height:8px; border-radius:50%; background:#ffd166;
+    box-shadow: 0 0 8px 2px rgba(255,209,102,0.8);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  .now-line.horizontal{
+    top:0; bottom:0; left:0; width:0;
+    border-left: 1.5px dashed #ffd166;
+  }
+  .now-line.horizontal::before{
+    content:""; position:absolute; top:-4px; left:-4px;
+    width:8px; height:8px; border-radius:50%; background:#ffd166;
+    box-shadow: 0 0 8px 2px rgba(255,209,102,0.8);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ transform:scale(1); opacity:1; }
+    50%{ transform:scale(1.4); opacity:0.6; }
+  }
+
+  /* ---------- CARDS ---------- */
+  .event-card{
+    position:absolute;
+    border-radius: 10px;
+    padding: 8px 9px 7px;
+    overflow:hidden; /* safety net — box is sized to fit content, this just guarantees containment */
+    cursor:default;
+    border: 1px solid;
+    backdrop-filter: blur(2px);
+    transition: transform .18s ease, box-shadow .18s ease, z-index 0s,
+                left .38s cubic-bezier(.4,0,.2,1), width .38s cubic-bezier(.4,0,.2,1),
+                top .38s cubic-bezier(.4,0,.2,1), height .38s cubic-bezier(.4,0,.2,1),
+                min-height .38s cubic-bezier(.4,0,.2,1), min-width .38s cubic-bezier(.4,0,.2,1),
+                opacity .3s ease;
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    height:auto; /* grows to fit wrapped subject title */
+    container-type: inline-size;
+    container-name: card;
+  }
+
+  /* progressively shrink type + padding as a card's own width shrinks
+     (e.g. multiple overlapping classes sharing a track) */
+  @container card (max-width: 110px){
+    .event-card{ padding: 6px 7px 6px; gap:1px; }
+    .event-card .subject{ font-size: 9.5px; line-height:1.18; }
+    .event-card .code, .event-card .student, .event-card .time-range{ font-size: 7.8px; }
+  }
+  @container card (max-width: 78px){
+    .event-card{ padding: 5px 6px 5px; }
+    .event-card .subject{ font-size: 8.6px; line-height:1.14; }
+  }
+  .event-card[data-student="Erica"]{ background: var(--erica-soft); border-color: var(--erica-border); }
+  .event-card[data-student="Erinn"]{ background: var(--erinn-soft); border-color: var(--erinn-border); }
+  .event-card[data-student="Erich"]{ background: var(--erich-soft); border-color: var(--erich-border); }
+
+  .event-card .subject{
+    font-family:'Inter', sans-serif;
+    font-weight:700;
+    font-size: clamp(10px, 0.78vw, 12.5px);
+    line-height:1.28;
+    color: var(--text);
+    white-space:normal;
+    overflow-wrap:break-word;
+    word-break:normal;
+    hyphens:none;
+    text-wrap:pretty; /* avoids single-word orphan lines where supported */
+    flex-shrink:0;
+  }
+  .event-card .meta-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:6px;
+    flex-shrink:0;
+  }
+  .event-card .code{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(8.5px, 0.62vw, 10.5px);
+    color: var(--text-muted);
+    white-space:normal;
+    overflow-wrap:break-word;
+    line-height:1.2;
+    max-width: 62%;
+  }
+  .event-card .student{
+    font-size: clamp(8.5px, 0.62vw, 10.5px);
+    font-weight:600;
+    color: var(--text-muted);
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .event-card[data-student="Erica"] .student{ color: var(--erica); }
+  .event-card[data-student="Erinn"] .student{ color: var(--erinn); }
+  .event-card[data-student="Erich"] .student{ color: var(--erich); }
+
+  .event-card .time-range{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: clamp(8px, 0.58vw, 10px);
+    color: var(--text-faint);
+    margin-top: auto;
+    white-space:normal;
+    overflow-wrap:break-word;
+    line-height:1.25;
+    flex-shrink:0;
+  }
+
+  .event-card:hover{
+    transform: scale(1.035);
+    z-index: 50 !important;
+    box-shadow: 0 10px 30px -6px rgba(0,0,0,0.55), 0 0 0 1px var(--hairline-strong);
+  }
+
+  .event-card.dimmed{
+    opacity: 0.12;
+    pointer-events:none;
+  }
+
+  /* small screens */
+  @media (max-width: 720px){
+    .clock{ display:none; }
+    .legend-item span.label{ display:none; }
+    .legend-item{ padding:7px; }
+  }
 </style>
 </head>
 <body>
 
-<div id="header">
-  <div id="tcBalance">0 TC</div>
-  <div id="tcTime">= 0h 0m</div>
-  <div id="tcEfficiency">Efficiency: 1.00×</div>
-</div>
-
-<div id="graphWrap">
-  <svg id="tcGraph" viewBox="0 0 560 56" preserveAspectRatio="none"></svg>
-  <div id="graphRangeSelector">
-    <div class="rangeBtn" data-range="6H">6H</div>
-    <div class="rangeBtn" data-range="12H">12H</div>
-    <div class="rangeBtn" data-range="24H">24H</div>
-    <div class="rangeBtn" data-range="1W">1W</div>
-  </div>
-</div>
-
-<div id="timers">
-  <div class="panel" id="stopwatchPanel">
-    <div class="panelTitle">Stopwatch — Earn</div>
-  </div>
-  <div class="panel" id="countdownPanel">
-    <div class="panelTitle">Countdown — Spend</div>
-  </div>
-</div>
-
-<div id="checklist">
-  <div id="checklistHead">
-    <h3>Checklist</h3>
-    <div id="hiddenToggle"></div>
-  </div>
-  <div id="addTaskRow">
-    <div id="starSelector" title="Reward">
-      <span class="star" data-n="1">★</span>
-      <span class="star" data-n="2">★</span>
-      <span class="star" data-n="3">★</span>
-      <span class="star" data-n="4">★</span>
-      <span class="star" data-n="5">★</span>
+<div class="app">
+  <header class="app-header">
+    <div class="now-playing" id="nowPlaying">
+      <span class="np-label" id="npLabel">NOW</span>
+      <div class="np-content" id="npContent"><!-- populated by JS --></div>
     </div>
-    <input type="text" id="newTaskInput" placeholder="Enter task...">
-    <button id="addTaskBtn">Add</button>
-  </div>
-  <div id="taskList"></div>
-</div>
+    <div class="legend" id="legend">
+      <button class="legend-item active" data-student="Erica"><span class="dot"></span><span class="label">Erica</span></button>
+      <button class="legend-item active" data-student="Erinn"><span class="dot"></span><span class="label">Erinn</span></button>
+      <button class="legend-item active" data-student="Erich"><span class="dot"></span><span class="label">Erich</span></button>
+    </div>
+    <button class="flip-btn" id="flipBtn" type="button" aria-label="Flip timetable axis">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13M7 7l4-4M7 7l4 4M17 17H4M17 17l-4-4M17 17l-4 4"/></svg>
+      <span id="flipBtnLabel">Days → Time</span>
+    </button>
+    <div class="clock" id="clock"></div>
+  </header>
 
+  <div class="grid-wrap" id="gridWrap">
+    <div id="axisTop"></div>
+    <div class="grid-body">
+      <div id="axisSide"></div>
+      <div id="tracks"></div>
+    </div>
+  </div>
+</div>
 
 <script>
-/* ============ CONSTANTS FROM rules.md ============ */
-const STOPWATCH = [
-  {key:'study',    name:'Study',          mult:1.35},
-  {key:'work',     name:'Work / Projects',mult:1.25},
-  {key:'exercise', name:'Exercise',       mult:1.10},
-  {key:'chores',   name:'Chores',         mult:0.95},
-  {key:'creative', name:'Creative',       mult:1.00},
-  {key:'reading',  name:'Reading',        mult:0.90},
-];
-const COUNTDOWN = [
-  {key:'break',    name:'Break',    mult:0.40, durationMin:15},
-  {key:'watching', name:'Watching', mult:0.80, durationMin:30},
-  {key:'gaming',   name:'Gaming',   mult:0.90, durationMin:30},
-  {key:'browsing', name:'Browsing', mult:1.05, durationMin:20},
-  {key:'outside',  name:'Outside',  mult:0.50, durationMin:45},
-];
+  // ---------- CONFIG ----------
+  const DAY_START = 8 * 60;   // 8:00 AM in minutes
+  const DAY_END   = 21 * 60;  // 9:00 PM in minutes
+  const TOTAL_MIN = DAY_END - DAY_START;
+  const DAYS = ["MON","TUE","WED","THU","FRI","SAT","SUN"];
+  const JS_DAY_INDEX = {SUN:0, MON:1, TUE:2, WED:3, THU:4, FRI:5, SAT:6};
+  const GAP = 4;
+  const MIN_CARD_W = 90;   // px floor for a card's short axis in "normal" mode
+  const MIN_CARD_H = 64;   // px floor for a card's cross axis
+  const ROTATE_THRESHOLD = 108; // px — below this, a normal-mode card is judged too narrow to read
 
-/* Fixed-point precision: all TC amounts stored internally as integer
-   "centi-TC" (hundredths of a TC) to avoid floating-point drift. */
-const CTC = 100; // 1 TC = 100 centi-TC
-function toCTC(tc){ return Math.round(tc * CTC); }
-function fromCTC(c){ return c / CTC; }
+  function t(h, m){ return h*60+m; }
 
-/* ============ CENTRALIZED ECONOMY: EFFICIENCY ============
-   TC -> Efficiency -> Timers -> TC -> repeat.
-   Efficiency is the single variable controlling both earning and spending:
-     Earning: TC_per_hour = base_TC_per_hour × base_multiplier × efficiency
-     Spending: TC_per_hour = base_TC_per_hour × base_multiplier ÷ efficiency
-   Higher TC -> lower efficiency. Lower/negative TC -> higher efficiency.
-   TC = 0 -> efficiency = 100%. No hard cap, no daily cap, no decay. */
-const EFFICIENCY_ANCHORS = [
-  {tc:-300, eff:1.40},
-  {tc:-100, eff:1.20},
-  {tc:0,    eff:1.00},
-  {tc:100,  eff:0.94},
-  {tc:250,  eff:0.84},
-  {tc:500,  eff:0.72},
-  {tc:1000, eff:0.60},
-];
+  // ---------- DATA ----------
+  const EVENTS = [
+    // MON
+    { day:"MON", start:t(12,0), end:t(14,0), student:"Erich", subject:"Physical Activity Towards Health and Fitness 1", code:"PATHFIT 1" },
+    { day:"MON", start:t(13,30), end:t(16,30), student:"Erinn", subject:"Financial Accounting and Reporting", code:"ACCO 101" },
+    { day:"MON", start:t(16,30), end:t(21,0), student:"Erich", subject:"Psychological Statistics", code:"PSYC 104" },
+    { day:"MON", start:t(18,0), end:t(21,0), student:"Erinn", subject:"Law on Obligations and Contracts", code:"LAW 101" },
+    // TUE
+    { day:"TUE", start:t(8,0), end:t(12,0), student:"Erica", subject:"Regulatory Framework for Business Transactions", code:"RFBT" },
+    { day:"TUE", start:t(13,30), end:t(16,30), student:"Erinn", subject:"Human Behavior in Organizations", code:"PSYC 011" },
+    { day:"TUE", start:t(13,30), end:t(16,30), student:"Erich", subject:"Daigdig", code:"GEED 004" },
+    { day:"TUE", start:t(18,0), end:t(21,0), student:"Erinn", subject:"Managerial Economics", code:"ECON 351" },
+    { day:"TUE", start:t(18,0), end:t(21,0), student:"Erich", subject:"Purposive Communication / Malayuning Komunikasyon", code:"GEED 005" },
+    // WED
+    { day:"WED", start:t(13,0), end:t(17,0), student:"Erica", subject:"Financial Accounting and Reporting", code:"FAR" },
+    // THU
+    { day:"THU", start:t(9,0), end:t(11,0), student:"Erinn", subject:"Physical Activity Towards Health and Fitness 1", code:"PATHFIT 1" },
+    { day:"THU", start:t(13,0), end:t(17,0), student:"Erica", subject:"Regulatory Framework for Business Transactions", code:"RFBT" },
+    { day:"THU", start:t(13,30), end:t(16,30), student:"Erinn", subject:"Financial Accounting and Reporting", code:"ACCO 101" },
+    { day:"THU", start:t(16,30), end:t(21,0), student:"Erich", subject:"Psychological Statistics", code:"PSYC 104" },
+    // FRI
+    { day:"FRI", start:t(8,0), end:t(16,0), student:"Erica", subject:"Auditing", code:"AUD" },
+    { day:"FRI", start:t(13,30), end:t(16,30), student:"Erinn", subject:"Understanding the Self / Pag-unawa sa Sarili", code:"GEED 001" },
+    { day:"FRI", start:t(15,0), end:t(18,0), student:"Erich", subject:"Understanding the Self / Pag-unawa sa Sarili", code:"GEED 001" },
+    { day:"FRI", start:t(16,30), end:t(19,30), student:"Erinn", subject:"Science, Technology and Society / Agham, Teknolohiya, at Lipunan", code:"GEED 007" },
+    { day:"FRI", start:t(18,0), end:t(21,0), student:"Erich", subject:"Introduction to Psychology", code:"PSYC 101" },
+    // SAT
+    { day:"SAT", start:t(13,0), end:t(17,0), student:"Erica", subject:"Financial Accounting and Reporting", code:"FAR" },
+    // SUN
+    { day:"SUN", start:t(8,0), end:t(12,0), student:"Erinn", subject:"Civic Welfare Training Service 1", code:"CWTS 001" },
+    { day:"SUN", start:t(8,0), end:t(12,0), student:"Erich", subject:"Civic Welfare Training Service 1", code:"CWTS 001" },
+    { day:"SUN", start:t(13,0), end:t(18,0), student:"Erinn", subject:"Civic Welfare Training Service 1", code:"CWTS 001" },
+    { day:"SUN", start:t(13,0), end:t(18,0), student:"Erich", subject:"Civic Welfare Training Service 1", code:"CWTS 001" },
+  ];
 
-// easeOutQuart: fast movement early in the segment, leveling off toward the
-// far end. t is normalized progress [0,1] through the current anchor segment.
-function easeOutQuart(t){
-  return 1 - Math.pow(1 - t, 4);
-}
+  function fmt(mins){
+    let h = Math.floor(mins/60), m = mins%60;
+    const ampm = h >= 12 ? "PM" : "AM";
+    let h12 = h % 12; if (h12 === 0) h12 = 12;
+    return `${h12}:${m.toString().padStart(2,"0")} ${ampm}`;
+  }
+  function fmtHour(mins){ // short form for rotated axis: "8", "12", "9"
+    let h = Math.floor(mins/60);
+    let h12 = h % 12; if (h12 === 0) h12 = 12;
+    return String(h12);
+  }
 
-// The single source of truth for the entire economy. Given the CURRENT TC
-// balance (whole TC, fractional), returns the current efficiency multiplier.
-// Interpolates between anchors using easeOutQuart easing; clamps to the first/
-// last anchor's value outside the anchor range.
-function efficiencyForBalance(balanceTC){
-  const first = EFFICIENCY_ANCHORS[0], last = EFFICIENCY_ANCHORS[EFFICIENCY_ANCHORS.length-1];
-  if(balanceTC <= first.tc) return first.eff;
-  if(balanceTC >= last.tc) return last.eff;
-  for(let i=0; i<EFFICIENCY_ANCHORS.length-1; i++){
-    const p0 = EFFICIENCY_ANCHORS[i], p1 = EFFICIENCY_ANCHORS[i+1];
-    if(balanceTC >= p0.tc && balanceTC <= p1.tc){
-      const t = (p1.tc === p0.tc) ? 0 : (balanceTC - p0.tc) / (p1.tc - p0.tc);
-      const eased = easeOutQuart(t);
-      return p0.eff + eased * (p1.eff - p0.eff);
+  // ---------- LAYOUT (overlap clustering) — orientation-agnostic ----------
+  // Given a list of events (all on the same day), assigns ev._col / ev._colCount
+  // representing which "lane" each event occupies along the non-time axis.
+  function layoutDayEvents(events){
+    const sorted = [...events].sort((a,b)=> a.start-b.start || a.end-b.end);
+    const clusters = [];
+    let current = [];
+    let currentMaxEnd = -1;
+    for(const ev of sorted){
+      if(current.length === 0 || ev.start < currentMaxEnd){
+        current.push(ev);
+        currentMaxEnd = Math.max(currentMaxEnd, ev.end);
+      } else {
+        clusters.push(current);
+        current = [ev];
+        currentMaxEnd = ev.end;
+      }
     }
+    if(current.length) clusters.push(current);
+
+    for(const cluster of clusters){
+      const columns = [];
+      for(const ev of cluster){
+        let placed = false;
+        for(let c=0; c<columns.length; c++){
+          if(columns[c] <= ev.start){
+            columns[c] = ev.end;
+            ev._col = c;
+            placed = true;
+            break;
+          }
+        }
+        if(!placed){
+          ev._col = columns.length;
+          columns.push(ev.end);
+        }
+      }
+      const colCount = columns.length;
+      for(const ev of cluster) ev._colCount = colCount;
+    }
+    return sorted;
   }
-  return last.eff;
-}
 
-/* ============ INDEXEDDB LAYER ============ */
-const DB_NAME = 'time_currency_db';
-const DB_VERSION = 1;
-let db;
+  // ---------- DOM refs ----------
+  const axisTop = document.getElementById("axisTop");
+  const axisSide = document.getElementById("axisSide");
+  const tracksEl = document.getElementById("tracks");
+  const gridWrap = document.getElementById("gridWrap");
 
-function openDB(){
-  return new Promise((resolve,reject)=>{
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e)=>{
-      const d = e.target.result;
-      if(!d.objectStoreNames.contains('state')) d.createObjectStore('state', {keyPath:'id'});
-      if(!d.objectStoreNames.contains('tasks')) d.createObjectStore('tasks', {keyPath:'id'});
-    };
-    req.onsuccess = (e)=>{ db = e.target.result; resolve(db); };
-    req.onerror = (e)=> reject(e);
-  });
-}
-function txStore(name, mode='readonly'){
-  return db.transaction(name, mode).objectStore(name);
-}
-function idbGet(store, key){
-  return new Promise((resolve,reject)=>{
-    const r = txStore(store).get(key);
-    r.onsuccess = ()=>resolve(r.result);
-    r.onerror = (e)=>reject(e);
-  });
-}
-function idbPut(store, value){
-  return new Promise((resolve,reject)=>{
-    const r = txStore(store,'readwrite').put(value);
-    r.onsuccess = ()=>resolve();
-    r.onerror = (e)=>reject(e);
-  });
-}
-function idbDelete(store, key){
-  return new Promise((resolve,reject)=>{
-    const r = txStore(store,'readwrite').delete(key);
-    r.onsuccess = ()=>resolve();
-    r.onerror = (e)=>reject(e);
-  });
-}
-function idbGetAll(store){
-  return new Promise((resolve,reject)=>{
-    const r = txStore(store).getAll();
-    r.onsuccess = ()=>resolve(r.result);
-    r.onerror = (e)=>reject(e);
-  });
-}
+  const now = new Date();
+  const jsDay = now.getDay();
+  const todayCode = Object.keys(JS_DAY_INDEX).find(k => JS_DAY_INDEX[k] === jsDay);
 
-/* ============ STATE ============ */
-let state = {
-  id:'main',
-  tc: 0,                 // BASE balance, integer centi-TC (hundredths). Persisted only on commit.
-  activeTimer: null,     // {type:'stopwatch'|'countdown', category, started_at, duration?}
-  history: [],           // [{t: timestamp, tc: fractional TC}], recorded at meaningful events only
-};
+  // ---------- STATE ----------
+  let activeStudents = new Set(["Erica","Erinn","Erich"]);
+  let orientation = "normal"; // "normal" | "rotated"
+  let trackEls = {};          // day -> track element (current orientation)
 
-const HISTORY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // keep enough to cover the full 1-week range
+  // ---------- BUILD (full DOM rebuild for a given orientation) ----------
+  function buildGrid(){
+    axisTop.innerHTML = "";
+    axisSide.innerHTML = "";
+    tracksEl.innerHTML = "";
+    trackEls = {};
 
-// Records a persistent history point at meaningful TC-changing events
-// (timer start/stop/expire, checklist toggle). Not called on every tick.
-// Prunes points older than 7 days rather than capping by count.
-function recordHistoryPoint(){
-  if(!Array.isArray(state.history)) state.history = [];
-  state.history.push({ t: Date.now(), tc: fromCTC(state.tc) });
-  const cutoff = Date.now() - HISTORY_MAX_AGE_MS;
-  state.history = state.history.filter(p => p.t >= cutoff);
-}
+    const rotated = orientation === "rotated";
+    axisTop.classList.toggle("rotated", rotated);
+    tracksEl.classList.toggle("rotated", rotated);
 
-async function loadState(){
-  const s = await idbGet('state','main');
-  if(s) state = s;
-  else await idbPut('state', state);
-  if(!Array.isArray(state.history)) state.history = [];
-}
-async function saveState(){
-  await idbPut('state', {...state});
-}
-
-/* ============ ECONOMY ============ */
-// TC changes flow through the single centralized Efficiency variable (see above).
-// Earning: TC_per_hour = base_TC_per_hour × base_multiplier × efficiency
-// Spending: TC_per_hour = base_TC_per_hour × base_multiplier ÷ efficiency
-// Efficiency is evaluated against the CURRENT balance at the moment of the
-// calculation, so it's always live/continuous. No caps, no decay, no clamps —
-// TC may go negative or grow without bound; checklist rewards and manual
-// editing are the only other places TC changes.
-
-// rawTC = elapsedMin × cat.mult (the BASE earn amount, before efficiency).
-// Applies the current efficiency, converts to fixed-point, and credits it.
-// Returns the net TC actually credited.
-function creditEarnedTC(rawTC){
-  const eff = efficiencyForBalance(fromCTC(state.tc));
-  const amountC = toCTC(rawTC * eff);
-  state.tc += amountC;
-  return fromCTC(amountC);
-}
-
-// rawTC = elapsedMin × cat.mult (the BASE spend amount, before efficiency).
-// Applies the current efficiency (division — lower efficiency costs MORE),
-// converts to fixed-point, and debits it. Returns the TC actually debited.
-function debitSpentTC(rawTC){
-  const eff = efficiencyForBalance(fromCTC(state.tc));
-  const amountC = toCTC(rawTC / eff);
-  state.tc -= amountC;
-  return fromCTC(amountC);
-}
-
-/* ============ TASKS ============ */
-let tasks = [];
-const STAR_REWARDS = { 1:3.00, 2:4.50, 3:5.00, 4:7.80, 5:10.00 }; // TC reward by star rating (1-5)
-
-async function loadTasks(){
-  tasks = await idbGetAll('tasks');
-}
-
-/* ============ TIMER TICK ============ */
-let tickHandle = null;
-
-function fmtElapsed(ms){
-  const s = Math.max(0, Math.floor(ms/1000));
-  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
-  return h>0 ? `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
-             : `${m}:${String(sec).padStart(2,'0')}`;
-}
-
-// Formats "time until 0 TC" (or any countdown remaining-time display).
-// Takes total seconds. Above 99s: normal minutes/hours format. At 99s or
-// below: seconds-only, updating every second. Display formatting only —
-// does not affect any underlying timer/TC calculation.
-function fmtCountdownTime(totalSeconds){
-  const secs = Math.max(0, Math.floor(totalSeconds));
-  if(secs <= 99){
-    return `${secs}s`;
-  }
-  const totalMin = Math.floor(secs/60);
-  const h = Math.floor(totalMin/60), m = totalMin%60;
-  return h>0 ? `${h}h ${String(m).padStart(2,'0')}m` : `${m}m`;
-}
-
-function startStopwatch(catKey){
-  if(state.activeTimer) stopActiveTimer(false, {silent:true}); // switching activities: interrupt, don't chain into auto-break
-  state.activeTimer = {type:'stopwatch', category:catKey, started_at: Date.now()};
-  recordHistoryPoint();
-  saveState();
-  render();
-}
-
-function startCountdown(catKey){
-  if(state.activeTimer) stopActiveTimer(false, {silent:true}); // switching activities: interrupt, don't chain into auto-break
-  const cat = COUNTDOWN.find(c=>c.key===catKey);
-  state.activeTimer = {type:'countdown', category:catKey, started_at: Date.now(), duration: cat.durationMin*60000};
-  recordHistoryPoint();
-  saveState();
-  render();
-}
-
-// Stops whatever is active.
-//  - expired: true when a countdown reached 0 naturally (full duration charged; never chains into auto-break).
-//  - opts.silent: true when this stop is happening BECAUSE the user is switching straight into a
-//    different activity (called from startStopwatch/startCountdown). In that case:
-//      * if the interrupted timer was Break, cancel it for free (no charge for the unfinished break)
-//      * never auto-chain into another Break (a new activity is already being started)
-//    A non-silent stop is the user explicitly clicking the active row to turn it off — that always
-//    applies the normal elapsed TC change, and if the stopped activity wasn't Break itself, it
-//    automatically starts the Break countdown next.
-function stopActiveTimer(expired=false, opts={}){
-  const silent = !!opts.silent;
-  const t = state.activeTimer;
-  if(!t) return;
-  const now = Date.now();
-  const wasBreak = (t.type === 'countdown' && t.category === 'break');
-  const freeCancelBreak = silent && wasBreak && !expired;
-
-  if(!freeCancelBreak){
-    if(t.type === 'stopwatch'){
-      const cat = STOPWATCH.find(c=>c.key===t.category);
-      const elapsedMin = (now - t.started_at)/60000;
-      const raw = elapsedMin * cat.mult;
-      creditEarnedTC(raw);
+    if(!rotated){
+      // ---- axisTop: day-name header row ----
+      DAYS.forEach(d=>{
+        const el = document.createElement("div");
+        el.className = "axis-top-day" + (d===todayCode ? " is-today" : "");
+        el.innerHTML = d + (d===todayCode ? '<span class="today-mark"></span>' : "");
+        axisTop.appendChild(el);
+      });
+      // ---- axisSide: vertical hour rail ----
+      const thread = document.createElement("div");
+      thread.className = "rail-thread";
+      axisSide.appendChild(thread);
+      for(let mins=DAY_START; mins<=DAY_END; mins+=60){
+        const pct = (mins-DAY_START)/TOTAL_MIN*100;
+        const tick = document.createElement("div");
+        tick.className = "rail-tick-time";
+        tick.style.top = pct + "%";
+        tick.innerHTML = `<span class="node"></span>${fmt(mins).replace(":00","")}`;
+        axisSide.appendChild(tick);
+      }
+      // ---- tracks: 7 day columns ----
+      DAYS.forEach(d=>{
+        const track = document.createElement("div");
+        track.className = "track" + (d===todayCode ? " is-today" : "");
+        track.dataset.day = d;
+        tracksEl.appendChild(track);
+        trackEls[d] = track;
+      });
     } else {
-      const cat = COUNTDOWN.find(c=>c.key===t.category);
-      let elapsedMs;
-      if(expired){
-        elapsedMs = t.duration; // full duration
-      } else {
-        elapsedMs = Math.min(now - t.started_at, t.duration);
+      // ---- axisTop: hourly time header (absolute ticks) ----
+      for(let mins=DAY_START; mins<=DAY_END; mins+=60){
+        const pct = (mins-DAY_START)/TOTAL_MIN*100;
+        const tick = document.createElement("div");
+        tick.className = "axis-top-hour";
+        tick.style.left = pct + "%";
+        tick.textContent = fmtHour(mins);
+        axisTop.appendChild(tick);
       }
-      const elapsedMin = elapsedMs/60000;
-      const raw = elapsedMin * cat.mult;
-      debitSpentTC(raw);
+      // ---- axisSide: day-name rail (stacked rows) ----
+      const thread = document.createElement("div");
+      thread.className = "rail-thread horizontal";
+      DAYS.forEach(d=>{
+        const el = document.createElement("div");
+        el.className = "rail-day" + (d===todayCode ? " is-today" : "");
+        el.innerHTML = d + (d===todayCode ? '<span class="today-mark"></span>' : "");
+        axisSide.appendChild(el);
+      });
+      // ---- tracks: 7 day rows ----
+      DAYS.forEach(d=>{
+        const track = document.createElement("div");
+        track.className = "track" + (d===todayCode ? " is-today" : "");
+        track.dataset.day = d;
+        tracksEl.appendChild(track);
+        trackEls[d] = track;
+      });
     }
-  }
-  state.activeTimer = null;
-  recordHistoryPoint();
-  saveState();
 
-  // Auto-start Break: only for an explicit user stop (not a switch, not a natural expiry),
-  // and only when the timer that was just stopped wasn't Break itself.
-  if(!silent && !expired && !wasBreak){
-    startCountdown('break');
-  }
-}
-
-function tick(){
-  if(!state.activeTimer){ render(); return; }
-  const t = state.activeTimer;
-  if(t.type === 'countdown'){
-    const remaining = t.duration - (Date.now() - t.started_at);
-    if(remaining <= 0){
-      stopActiveTimer(true);
-    }
-  }
-  render();
-}
-
-/* ============ UI BUILD ============ */
-const stopwatchPanel = document.getElementById('stopwatchPanel');
-const countdownPanel = document.getElementById('countdownPanel');
-const taskListEl = document.getElementById('taskList');
-const hiddenToggleEl = document.getElementById('hiddenToggle');
-
-let showCompleted = false;
-
-function buildStaticRows(){
-  STOPWATCH.forEach(cat=>{
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.dataset.key = cat.key;
-    row.innerHTML = `
-      <div class="rowLeft">
-        <div class="rowName">${cat.name}</div>
-        <div class="rowRate">${cat.mult.toFixed(2)}× (${cat.mult.toFixed(2)}×) - +${(cat.mult*60).toFixed(2)} TC/hr</div>
-      </div>
-      <div class="rowValue">—</div>
-    `;
-    row.addEventListener('click', ()=>{
-      if(state.activeTimer && state.activeTimer.type==='stopwatch' && state.activeTimer.category===cat.key){
-        stopActiveTimer();
-        render();
-      } else {
-        startStopwatch(cat.key);
-      }
+    // ---- cards: created once per build, geometry applied by updateLayout() ----
+    DAYS.forEach(d=>{
+      const dayEvents = EVENTS.filter(e=>e.day===d);
+      dayEvents.forEach(ev=>{
+        const card = document.createElement("div");
+        card.className = "event-card";
+        card.dataset.student = ev.student;
+        card.innerHTML = `
+          <div class="subject">${ev.subject}</div>
+          <div class="meta-row">
+            <span class="code">${ev.code}</span>
+            <span class="student">${ev.student}</span>
+          </div>
+          <div class="time-range">${fmt(ev.start)} – ${fmt(ev.end)}</div>
+        `;
+        trackEls[d].appendChild(card);
+        ev._el = card;
+      });
     });
-    stopwatchPanel.appendChild(row);
-  });
 
-  COUNTDOWN.forEach(cat=>{
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.dataset.key = cat.key;
-    row.innerHTML = `
-      <div class="rowLeft">
-        <div class="rowName">${cat.name}</div>
-        <div class="rowRate">${cat.mult.toFixed(2)}× (${cat.mult.toFixed(2)}×) - -${(cat.mult*60).toFixed(2)} TC/hr</div>
-      </div>
-      <div class="rowValue">—</div>
-    `;
-    row.addEventListener('click', ()=>{
-      if(state.activeTimer && state.activeTimer.type==='countdown' && state.activeTimer.category===cat.key){
-        stopActiveTimer();
-        render();
-      } else {
-        startCountdown(cat.key);
+    // ---- now-line ----
+    if(todayCode){
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      if(nowMin >= DAY_START && nowMin <= DAY_END){
+        const pct = (nowMin-DAY_START)/TOTAL_MIN*100;
+        const line = document.createElement("div");
+        if(!rotated){
+          line.className = "now-line vertical";
+          line.style.top = pct + "%";
+        } else {
+          line.className = "now-line horizontal";
+          line.style.left = pct + "%";
+        }
+        trackEls[todayCode].appendChild(line);
       }
-    });
-    countdownPanel.appendChild(row);
-  });
-}
-
-// Computes the current LIVE balance (fractional TC) for display only.
-// Base persisted balance + whatever the active timer has accrued so far.
-// Never mutates state.tc.
-function liveBalanceTC(){
-  const baseTC = fromCTC(state.tc);
-  const t = state.activeTimer;
-  if(!t) return baseTC;
-
-  // Efficiency is evaluated against the current base balance so the live
-  // display reacts immediately if the balance changes for any other reason
-  // (e.g. a checklist reward) while a timer is running.
-  const eff = efficiencyForBalance(baseTC);
-
-  if(t.type === 'stopwatch'){
-    const cat = STOPWATCH.find(c=>c.key===t.category);
-    const elapsedMin = (Date.now() - t.started_at)/60000;
-    const raw = elapsedMin * cat.mult * eff;
-    return baseTC + fromCTC(toCTC(raw)); // same rounding creditEarnedTC will apply at commit
-  } else {
-    const cat = COUNTDOWN.find(c=>c.key===t.category);
-    const elapsedMs = Math.min(Date.now() - t.started_at, t.duration);
-    const elapsedMin = elapsedMs/60000;
-    const raw = (elapsedMin * cat.mult) / eff;
-    return baseTC - raw;
-  }
-}
-
-// Time-range selector for the graph. Selection lives in memory only
-// (resets to the 6H default on reload); underlying history is always persisted.
-const GRAPH_RANGES = {
-  '6H':  6  * 60 * 60 * 1000,
-  '12H': 12 * 60 * 60 * 1000,
-  '24H': 24 * 60 * 60 * 1000,
-  '1W':  7  * 24 * 60 * 60 * 1000,
-};
-let selectedGraphRange = '6H';
-
-document.querySelectorAll('.rangeBtn').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    selectedGraphRange = btn.dataset.range;
-    document.querySelectorAll('.rangeBtn').forEach(b=>b.classList.toggle('active', b===btn));
-    drawGraph();
-  });
-});
-document.querySelector(`.rangeBtn[data-range="${selectedGraphRange}"]`).classList.add('active');
-
-// Draws the compact TC history graph. Persistent points come from state.history
-// (recorded only at meaningful events); a transient live point is appended
-// for the current instant so an active timer's movement is visible without
-// writing to the database every frame. Only points within the selected time
-// range are shown; Y bounds are recalculated from the visible data each draw.
-function drawGraph(){
-  const svg = document.getElementById('tcGraph');
-  const hist = Array.isArray(state.history) ? state.history : [];
-  const now = Date.now();
-  const rangeMs = GRAPH_RANGES[selectedGraphRange] || GRAPH_RANGES['6H'];
-  const rangeStart = now - rangeMs;
-
-  let points = hist.filter(p => p.t >= rangeStart);
-  points.push({ t: now, tc: liveBalanceTC() }); // transient live endpoint, not persisted
-
-  if(points.length < 2){
-    svg.innerHTML = '';
-    return;
-  }
-
-  const w = 560, h = 56, pad = 4;
-  const minT = rangeStart, maxT = now;
-  const vals = points.map(p=>p.tc);
-  let minV = Math.min(...vals), maxV = Math.max(...vals);
-  const rawSpan = maxV - minV;
-  const yPad = Math.max(0.5, rawSpan * 0.1); // small padding so the line doesn't touch the edges
-  minV -= yPad; maxV += yPad;
-  const spanT = Math.max(1, maxT - minT);
-  const spanV = Math.max(0.01, maxV - minV);
-
-  const coords = points.map(p=>{
-    const x = pad + ((p.t - minT) / spanT) * (w - 2*pad);
-    const y = (h - pad) - ((p.tc - minV) / spanV) * (h - 2*pad);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-
-  const lastTC = points[points.length-1].tc;
-  let color;
-  if(lastTC < 0){
-    color = 'var(--spend)'; // negative balance: red/spend accent regardless of direction
-  } else {
-    const rising = lastTC >= points[0].tc;
-    color = rising ? 'var(--earn)' : 'var(--spend)';
-  }
-  svg.innerHTML = `<polyline points="${coords}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
-}
-
-/* ---- Hidden TC editing (double-click the balance) ---- */
-let tcEditOpen = false;
-const tcBalanceEl = document.getElementById('tcBalance');
-function openTCEdit(){
-  if(tcEditOpen) return;
-  tcEditOpen = true;
-  const currentVal = fromCTC(state.tc).toFixed(2);
-  // Field starts BLANK (current value shown only as a placeholder) so there is
-  // zero ambiguity: whatever the user types is the new balance, not an addition.
-  tcBalanceEl.innerHTML = `<input type="text" inputmode="decimal" class="tcEditInput" id="tcEditInput" value="" placeholder="${currentVal}">`;
-  const input = document.getElementById('tcEditInput');
-  input.focus();
-
-  let resolved = false;
-  function finish(save){
-    if(resolved) return;
-    resolved = true;
-    tcEditOpen = false;
-    if(save){
-      const raw = input.value.trim();
-      const num = Number(raw);
-      if(raw !== '' && Number.isFinite(num)){
-        // REPLACE the stored balance entirely — never add to the existing value.
-        state.tc = toCTC(num);
-        recordHistoryPoint();
-        saveState();
-      }
-      // empty/invalid/non-numeric input is silently rejected — balance stays unchanged
     }
-    render();
   }
-  input.addEventListener('keydown', (e)=>{
-    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
-    else if(e.key === 'Escape'){ e.preventDefault(); finish(false); }
-  });
-  input.addEventListener('blur', ()=> finish(true));
-}
-tcBalanceEl.addEventListener('dblclick', openTCEdit);
 
-function render(){
-  // Header
-  const balEl = document.getElementById('tcBalance');
-  const liveTC = liveBalanceTC();
-  if(!tcEditOpen){
-    balEl.textContent = `${liveTC.toFixed(2)} TC`;
-    balEl.classList.toggle('neg', liveTC < 0);
+  // ---------- LAYOUT: apply geometry to existing cards (no rebuild) ----------
+  function updateLayout(){
+    const rotated = orientation === "rotated";
+    DAYS.forEach(d=>{
+      const dayEvents = EVENTS.filter(e=>e.day===d);
+      const visible = dayEvents.filter(e=>activeStudents.has(e.student));
+      const hidden = dayEvents.filter(e=>!activeStudents.has(e.student));
+
+      const laidOut = layoutDayEvents(visible);
+      laidOut.forEach(ev=>{
+        const timeStartPct = (ev.start-DAY_START)/TOTAL_MIN*100;
+        const timeSpanPct = (ev.end-ev.start)/TOTAL_MIN*100;
+        const lanePct = 100/ev._colCount;
+        const laneOffsetPct = ev._col * lanePct;
+        // The lane (overlap) axis is capped to whatever space actually remains
+        // in THIS day's track after the offset — so a wide minimum floor can
+        // never push a card past its own day's right/bottom edge. This is what
+        // "compress the offset, reduce width, reposition" means in practice.
+        const laneSizeExpr = `min(calc(100% - ${laneOffsetPct}% - ${GAP/2}px), max(${MIN_CARD_W}px, calc(${lanePct}% - ${GAP}px)))`;
+        const laneSizeExprH = `min(calc(100% - ${laneOffsetPct}% - ${GAP/2}px), max(${MIN_CARD_H}px, calc(${lanePct}% - ${GAP}px)))`;
+
+        if(!rotated){
+          // time = vertical, lane (overlap) = horizontal — day boundaries run left/right
+          ev._el.style.top = `calc(${timeStartPct}% + ${GAP/2}px)`;
+          ev._el.style.minHeight = `max(${MIN_CARD_H}px, calc(${timeSpanPct}% - ${GAP}px))`;
+          ev._el.style.height = "auto";
+          ev._el.style.left = `calc(${laneOffsetPct}% + ${GAP/2}px)`;
+          ev._el.style.width = laneSizeExpr;
+          ev._el.style.minWidth = "";
+        } else {
+          // time = horizontal, lane (overlap) = vertical — day boundaries run top/bottom
+          ev._el.style.left = `calc(${timeStartPct}% + ${GAP/2}px)`;
+          ev._el.style.minWidth = `max(${MIN_CARD_W}px, calc(${timeSpanPct}% - ${GAP}px))`;
+          ev._el.style.width = `max(${MIN_CARD_W}px, calc(${timeSpanPct}% - ${GAP}px))`;
+          ev._el.style.top = `calc(${laneOffsetPct}% + ${GAP/2}px)`;
+          ev._el.style.height = laneSizeExprH;
+          ev._el.style.minHeight = "";
+        }
+        ev._el.style.zIndex = Math.round(1 + ev._col);
+        ev._el.classList.remove("dimmed");
+        ev._el.style.pointerEvents = "";
+      });
+
+      hidden.forEach(ev=>{
+        ev._el.classList.add("dimmed");
+        ev._el.style.pointerEvents = "none";
+      });
+    });
   }
-  const totalMin = Math.abs(liveTC);
-  const h = Math.floor(totalMin/60), m = Math.floor(totalMin%60);
-  document.getElementById('tcTime').textContent = `= ${liveTC<0?'-':''}${h}h ${m}m`;
 
-  // The single centralized efficiency value, evaluated against the current
-  // live balance so every rate label below reacts immediately to it.
-  const eff = efficiencyForBalance(liveTC);
-  document.getElementById('tcEfficiency').textContent = `Efficiency: ${eff.toFixed(2)}×`;
-
-  // Timer rows
-  document.querySelectorAll('#stopwatchPanel .row').forEach(row=>{
-    const key = row.dataset.key;
-    const cat = STOPWATCH.find(c=>c.key===key);
-    const active = state.activeTimer && state.activeTimer.type==='stopwatch' && state.activeTimer.category===key;
-    row.classList.toggle('active', !!active);
-    const valEl = row.querySelector('.rowValue');
-    if(active){
-      const elapsedMs = Date.now() - state.activeTimer.started_at;
-      const raw = (elapsedMs/60000) * cat.mult * eff;
-      valEl.textContent = `${fmtElapsed(elapsedMs)}`;
-      valEl.title = `+${fromCTC(toCTC(raw)).toFixed(2)} TC so far`;
+  // ---------- ORCHESTRATION ----------
+  // Orientation is controlled entirely by the user via the flip button — it is
+  // never inferred from viewport size or content pressure. Responsive scaling
+  // (font/padding shrink at small card sizes) is handled separately by the
+  // CSS container queries on .event-card.
+  function renderAll({ animateOrientation = false } = {}){
+    if(animateOrientation){
+      gridWrap.classList.add("switching");
+      window.setTimeout(()=>{
+        buildGrid();
+        updateLayout();
+        requestAnimationFrame(()=>{ gridWrap.classList.remove("switching"); });
+      }, 220);
     } else {
-      valEl.textContent = '—';
+      buildGrid();
+      updateLayout();
     }
-    // Earning: base × multiplier × efficiency — live, reacts to the current balance.
-    const effRate = cat.mult * eff;
-    const rateEl = row.querySelector('.rowRate');
-    if(rateEl){
-      rateEl.textContent = `${cat.mult.toFixed(2)}× (${effRate.toFixed(2)}×) - +${(effRate*60).toFixed(2)} TC/hr`;
+  }
+
+  // initial build — always starts in the traditional "days across the top,
+  // time down the side" view, with no animation on first paint.
+  orientation = "normal";
+  buildGrid();
+  updateLayout();
+
+  // ---------- clock ----------
+  const clockEl = document.getElementById("clock");
+  function updateClock(){
+    const d = new Date();
+    clockEl.innerHTML = `<span>${d.toLocaleDateString(undefined,{month:'short', day:'numeric'})}</span> · ${d.toLocaleTimeString(undefined,{hour:'2-digit', minute:'2-digit'})}`;
+  }
+  updateClock();
+  setInterval(updateClock, 30000);
+
+  // ---------- NOW PLAYING (single source of truth: EVENTS) ----------
+  const DAY_FULL = {MON:"Monday",TUE:"Tuesday",WED:"Wednesday",THU:"Thursday",FRI:"Friday",SAT:"Saturday",SUN:"Sunday"};
+  const npLabelEl = document.getElementById("npLabel");
+  const npContentEl = document.getElementById("npContent");
+
+  function dayCodeFromDate(d){
+    const idx = d.getDay();
+    return Object.keys(JS_DAY_INDEX).find(k => JS_DAY_INDEX[k] === idx);
+  }
+  function formatDur(mins){
+    mins = Math.max(0, Math.round(mins));
+    const h = Math.floor(mins/60), m = mins%60;
+    if(h<=0) return `${m} min`;
+    if(m===0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
+  function studentTag(student){
+    return `<span class="np-who" data-student="${student}"><span class="dot"></span>${student}</span>`;
+  }
+
+  // Reads directly from EVENTS — the exact data the grid renders from —
+  // so the header can never drift out of sync with the timetable.
+  function computeNowPlayingState(){
+    const d = new Date();
+    const code = dayCodeFromDate(d);
+    const mins = d.getHours()*60 + d.getMinutes();
+
+    const todays = EVENTS.filter(e=>e.day===code).sort((a,b)=>a.start-b.start);
+    const active = todays.filter(e=> mins>=e.start && mins<e.end);
+
+    if(active.length > 1){
+      return { mode:"multi", key:"multi:"+active.map(e=>e.day+e.start+e.student).join(","), events:active };
     }
-  });
-
-  document.querySelectorAll('#countdownPanel .row').forEach(row=>{
-    const key = row.dataset.key;
-    const cat = COUNTDOWN.find(c=>c.key===key);
-    const active = state.activeTimer && state.activeTimer.type==='countdown' && state.activeTimer.category===key;
-    row.classList.toggle('active', !!active);
-    row.classList.toggle('spend-mode', !!active);
-    const valEl = row.querySelector('.rowValue');
-    // Spending: base × multiplier ÷ efficiency. "Time until 0 TC" at this
-    // activity's current effective spend rate, computed from the live balance.
-    const effRate = cat.mult / eff;
-    const secondsToZero = liveTC > 0 ? (liveTC / effRate) * 60 : 0;
-    valEl.textContent = fmtCountdownTime(secondsToZero);
-    const rateEl = row.querySelector('.rowRate');
-    if(rateEl){
-      rateEl.textContent = `${cat.mult.toFixed(2)}× (${effRate.toFixed(2)}×) - -${(effRate*60).toFixed(2)} TC/hr`;
+    if(active.length === 1){
+      const e = active[0];
+      return { mode:"single", key:"single:"+e.day+e.start+e.student, event:e, now:mins };
     }
-  });
-
-  renderTasks();
-  drawGraph();
-}
-
-function renderTasks(){
-  taskListEl.innerHTML = '';
-  const visible = tasks.filter(t=> showCompleted || !t.done);
-  visible.sort((a,b)=> (a.done - b.done) || (a.createdAt - b.createdAt));
-  visible.forEach(task=>{
-    const row = document.createElement('div');
-    row.className = 'taskRow' + (task.done ? ' done' : '');
-    row.innerHTML = `
-      <input type="checkbox" ${task.done?'checked':''}>
-      <div class="taskName">${escapeHTML(task.name)}</div>
-      <div class="taskReward">+${task.reward.toFixed(2)} TC</div>
-      <div class="taskDel">✕</div>
-    `;
-    row.querySelector('input').addEventListener('change', ()=>toggleTask(task.id));
-    row.querySelector('.taskDel').addEventListener('click', ()=>deleteTask(task.id));
-    taskListEl.appendChild(row);
-  });
-  const completedCount = tasks.filter(t=>t.done).length;
-  hiddenToggleEl.textContent = completedCount>0 ? (showCompleted ? 'Hide completed' : `Show completed (${completedCount})`) : '';
-}
-
-function escapeHTML(s){
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-hiddenToggleEl.addEventListener('click', ()=>{ showCompleted = !showCompleted; renderTasks(); });
-
-/* ============ TASK ACTIONS ============ */
-async function toggleTask(id){
-  const task = tasks.find(t=>t.id===id);
-  if(!task) return;
-  task.done = !task.done;
-  if(task.done){
-    state.tc += toCTC(task.reward);
-  } else {
-    state.tc -= toCTC(task.reward);
+    const upcomingToday = todays.filter(e=> e.start > mins).sort((a,b)=>a.start-b.start)[0];
+    if(upcomingToday){
+      return { mode:"upnext", key:"upnext:"+upcomingToday.day+upcomingToday.start+upcomingToday.student, event:upcomingToday, now:mins };
+    }
+    const todayIdx = DAYS.indexOf(code);
+    for(let offset=1; offset<=7; offset++){
+      const dcode = DAYS[(todayIdx+offset) % 7];
+      const dayEvents = EVENTS.filter(e=>e.day===dcode).sort((a,b)=>a.start-b.start);
+      if(dayEvents.length){
+        return { mode:"daycomplete", key:"daycomplete:"+dcode+dayEvents[0].start+dayEvents[0].student, event:dayEvents[0] };
+      }
+    }
+    return { mode:"none", key:"none" };
   }
-  recordHistoryPoint();
-  await idbPut('tasks', task);
-  await saveState();
-  render();
-}
 
-async function deleteTask(id){
-  const task = tasks.find(t=>t.id===id);
-  if(!task) return;
-  if(task.done){
-    state.tc -= toCTC(task.reward); // remove awarded TC if it was completed
-    recordHistoryPoint();
-    await saveState();
+  function renderNowPlayingContent(state){
+    if(state.mode === "multi"){
+      npLabelEl.textContent = "NOW PLAYING";
+      npContentEl.innerHTML = state.events.map(e => `
+        <div class="np-multi-row">
+          <span class="np-multi-subject">${e.subject}</span>
+          ${studentTag(e.student)}
+        </div>`).join("");
+      return;
+    }
+    if(state.mode === "single"){
+      npLabelEl.textContent = "NOW";
+      const e = state.event;
+      const pct = Math.min(100, Math.max(0, (state.now-e.start)/(e.end-e.start)*100));
+      npContentEl.innerHTML = `
+        <div class="np-title-row">
+          <span class="np-subject">${e.subject}</span>
+          ${studentTag(e.student)}
+        </div>
+        <div class="np-meta">${e.code} · ${DAY_FULL[e.day]} · ${fmt(e.start)} – ${fmt(e.end)}</div>
+        <div class="np-progress-row" style="--np-color:var(--${e.student.toLowerCase()})">
+          <div class="np-track"><div class="np-fill" style="width:${pct}%"></div></div>
+          <div class="np-timing-row"><span>${fmt(e.start)}</span><span>${formatDur(e.end-state.now)} remaining</span></div>
+        </div>`;
+      return;
+    }
+    if(state.mode === "upnext"){
+      npLabelEl.textContent = "UP NEXT";
+      const e = state.event;
+      npContentEl.innerHTML = `
+        <div class="np-title-row">
+          <span class="np-subject">${e.subject}</span>
+          ${studentTag(e.student)}
+        </div>
+        <div class="np-meta">${e.code} · Today · ${fmt(e.start)} – ${fmt(e.end)}</div>
+        <div class="np-meta">Starts in ${formatDur(e.start-state.now)}</div>`;
+      return;
+    }
+    if(state.mode === "daycomplete"){
+      npLabelEl.textContent = "DAY COMPLETE";
+      const e = state.event;
+      npContentEl.innerHTML = `
+        <div class="np-title-row">
+          <span class="np-subject">${e.subject}</span>
+          ${studentTag(e.student)}
+        </div>
+        <div class="np-meta">${e.code} · ${DAY_FULL[e.day]} · ${fmt(e.start)} – ${fmt(e.end)}</div>`;
+      return;
+    }
+    npLabelEl.textContent = "SCHEDULE";
+    npContentEl.innerHTML = `<div class="np-meta">No classes scheduled.</div>`;
   }
-  tasks = tasks.filter(t=>t.id!==id);
-  await idbDelete('tasks', id);
-  render();
-}
 
-/* ---- Star selector (checklist reward picker) ---- */
-let selectedStars = 1;
-const starEls = document.querySelectorAll('#starSelector .star');
-function renderStarSelector(){
-  starEls.forEach(el=>{
-    const n = parseInt(el.dataset.n, 10);
-    el.classList.toggle('filled', n <= selectedStars);
-  });
-}
-starEls.forEach(el=>{
-  el.addEventListener('click', ()=>{
-    selectedStars = parseInt(el.dataset.n, 10);
-    renderStarSelector();
-  });
-});
-renderStarSelector();
-
-const newTaskInput = document.getElementById('newTaskInput');
-async function addTaskFromInput(){
-  const name = newTaskInput.value.trim();
-  if(!name) return;
-  const reward = STAR_REWARDS[selectedStars];
-  const task = { id: 'task_'+Date.now()+'_'+Math.random().toString(36).slice(2,7), name, reward, stars:selectedStars, done:false, createdAt: Date.now() };
-  tasks.push(task);
-  await idbPut('tasks', task);
-  newTaskInput.value = '';
-  selectedStars = 1;
-  renderStarSelector();
-  newTaskInput.focus();
-  render();
-}
-document.getElementById('addTaskBtn').addEventListener('click', addTaskFromInput);
-newTaskInput.addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter'){
-    e.preventDefault();
-    addTaskFromInput();
+  let npCurrentKey = null;
+  function updateNowPlaying(){
+    const state = computeNowPlayingState();
+    if(state.key !== npCurrentKey){
+      // the active class (or state) itself changed — cross-fade like a track change
+      npCurrentKey = state.key;
+      npContentEl.classList.add("switching");
+      window.setTimeout(()=>{
+        renderNowPlayingContent(state);
+        requestAnimationFrame(()=> npContentEl.classList.remove("switching"));
+      }, 220);
+    } else if(state.mode === "single"){
+      // same class still running — just advance the progress bar / remaining time, no transition
+      const e = state.event;
+      const pct = Math.min(100, Math.max(0, (state.now-e.start)/(e.end-e.start)*100));
+      const fillEl = npContentEl.querySelector(".np-fill");
+      const remainEl = npContentEl.querySelector(".np-timing-row span:last-child");
+      if(fillEl) fillEl.style.width = pct + "%";
+      if(remainEl) remainEl.textContent = formatDur(e.end-state.now) + " remaining";
+    } else if(state.mode === "upnext"){
+      const e = state.event;
+      const metas = npContentEl.querySelectorAll(".np-meta");
+      if(metas[1]) metas[1].textContent = `Starts in ${formatDur(e.start-state.now)}`;
+    }
   }
-});
 
-/* ============ INIT ============ */
-async function init(){
-  await openDB();
-  await loadState();
-  await loadTasks();
-  buildStaticRows();
-  render();
-  tickHandle = setInterval(tick, 500); // display refresh only; TC math always derived from timestamps
+  updateNowPlaying();
+  setInterval(updateNowPlaying, 15000); // smooth-enough live progress without a per-second re-render
 
-  // Persist on close as a safety net (state is already saved on every change,
-  // this just re-confirms the active timer timestamp is intact).
-  window.addEventListener('beforeunload', ()=>{ saveState(); });
-}
-init();
+  // ---------- legend filters ----------
+  const legendItems = document.querySelectorAll(".legend-item");
+
+  function applyFilter(){
+    legendItems.forEach(item=>{
+      const s = item.dataset.student;
+      item.classList.toggle("active", activeStudents.has(s));
+      item.classList.toggle("dimmed", !activeStudents.has(s));
+    });
+    // recompute widths/positions for the current orientation only —
+    // filtering never changes which axis represents time vs. days
+    updateLayout();
+  }
+
+  legendItems.forEach(item=>{
+    item.addEventListener("click", ()=>{
+      const s = item.dataset.student;
+      const allActive = activeStudents.size === 3;
+      if(allActive){
+        activeStudents = new Set([s]);
+      } else if(activeStudents.has(s) && activeStudents.size===1){
+        activeStudents = new Set(["Erica","Erinn","Erich"]);
+      } else if(activeStudents.has(s)){
+        activeStudents.delete(s);
+        if(activeStudents.size===0) activeStudents = new Set(["Erica","Erinn","Erich"]);
+      } else {
+        activeStudents.add(s);
+      }
+      applyFilter();
+    });
+  });
+
+  // ---------- flip-axis control (manual only) ----------
+  const flipBtn = document.getElementById("flipBtn");
+  const flipBtnLabel = document.getElementById("flipBtnLabel");
+
+  function updateFlipButton(){
+    const rotated = orientation === "rotated";
+    flipBtn.classList.toggle("rotated", rotated);
+    // label always names the axis layout you'll get by pressing again
+    flipBtnLabel.textContent = rotated ? "Time → Days" : "Days → Time";
+    flipBtn.setAttribute("aria-pressed", rotated ? "true" : "false");
+  }
+  updateFlipButton();
+
+  flipBtn.addEventListener("click", ()=>{
+    orientation = orientation === "normal" ? "rotated" : "normal";
+    updateFlipButton();
+    renderAll({ animateOrientation:true });
+  });
 </script>
+
 </body>
 </html>
